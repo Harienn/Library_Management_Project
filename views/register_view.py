@@ -44,39 +44,34 @@ class RegisterView:
         # ✅ PASSWORD FIELD với TEXT TOGGLE
         password_field = ft.TextField(
             hint_text="Enter password",
-            password=True,  # Mặc định ẩn password
+            password=True,
             border_radius=8,
             border_color=ft.Colors.GREY_300,
             height=50,
             text_size=14,
-            content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),  # Thêm padding phải cho button
+            content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),
         )
         
-        # Text button thay cho icon
         password_toggle_btn = ft.TextButton(
             content=ft.Text("Show", size=13, weight=ft.FontWeight.W_500),
             style=ft.ButtonStyle(
                 color={"": ft.Colors.CYAN_400},
                 padding=ft.padding.all(0),
             ),
-            on_click=None,  # Sẽ set sau
+            on_click=None,
         )
         
         def toggle_password_visibility(e):
-            """Toggle hiển thị/ẩn password"""
             if password_field.password:
-                # Đang ẩn → Hiện password
                 password_field.password = False
                 password_toggle_btn.content = ft.Text("Hide", size=13, weight=ft.FontWeight.W_500)
             else:
-                # Đang hiện → Ẩn password
                 password_field.password = True
                 password_toggle_btn.content = ft.Text("Show", size=13, weight=ft.FontWeight.W_500)
             self.page.update()
         
         password_toggle_btn.on_click = toggle_password_visibility
         
-        # Stack password field với button
         password_container = ft.Stack(
             [
                 password_field,
@@ -89,7 +84,7 @@ class RegisterView:
             height=50,
         )
         
-        # ✅ CONFIRM PASSWORD FIELD với TEXT TOGGLE
+        # ✅ CONFIRM PASSWORD
         confirm_password_field = ft.TextField(
             hint_text="Re-enter password",
             password=True,
@@ -100,7 +95,6 @@ class RegisterView:
             content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),
         )
         
-        # Text button cho confirm password
         confirm_password_toggle_btn = ft.TextButton(
             content=ft.Text("Show", size=13, weight=ft.FontWeight.W_500),
             style=ft.ButtonStyle(
@@ -111,7 +105,6 @@ class RegisterView:
         )
         
         def toggle_confirm_password_visibility(e):
-            """Toggle hiển thị/ẩn confirm password"""
             if confirm_password_field.password:
                 confirm_password_field.password = False
                 confirm_password_toggle_btn.content = ft.Text("Hide", size=13, weight=ft.FontWeight.W_500)
@@ -122,7 +115,6 @@ class RegisterView:
         
         confirm_password_toggle_btn.on_click = toggle_confirm_password_visibility
         
-        # Stack confirm password field với button
         confirm_password_container = ft.Stack(
             [
                 confirm_password_field,
@@ -136,20 +128,18 @@ class RegisterView:
         )
         
         def show_error(message):
-            """Hiển thị thông báo lỗi"""
             error_text.value = message
             error_text.visible = True
             self.page.update()
         
         def hide_error():
-            """Ẩn thông báo lỗi"""
             error_text.visible = False
             self.page.update()
         
         def handle_register(e):
             hide_error()
             
-            # ✅ VALIDATE FORM
+            # Validate
             if not full_name_field.value:
                 show_error("Please enter your full name")
                 return
@@ -158,10 +148,9 @@ class RegisterView:
                 show_error("Please enter your email")
                 return
             
-            # ✅ VALIDATE EMAIL PHẢI CÓ DẤU @
             if "@" not in email_field.value:
                 show_error("Email must contain @ symbol")
-                email_field.value = ""  # Xóa email không hợp lệ
+                email_field.value = ""
                 self.page.update()
                 return
             
@@ -177,12 +166,11 @@ class RegisterView:
                 show_error("Passwords do not match")
                 return
             
-            # ✅ VALIDATE PASSWORD TỐI THIỂU 8 KÝ TỰ
             if len(password_field.value) < 8:
                 show_error("Password must be at least 8 characters long")
                 return
             
-            # ✅ GỌI HÀM REGISTER_USER
+            # ✅ ĐĂNG KÝ
             success, message = register_user(
                 full_name_field.value,
                 email_field.value,
@@ -191,8 +179,20 @@ class RegisterView:
             
             # ✅ XỬ LÝ KẾT QUẢ
             if success:
-                # Đăng ký thành công -> chuyển về trang login
-                self.navigate("/login")
+                # ✅ TỰ ĐỘNG ĐĂNG NHẬP SAU KHI ĐĂNG KÝ
+                from auth_service import login_user
+                login_success, login_message, user_data = login_user(
+                    email_field.value,
+                    password_field.value
+                )
+                
+                if login_success and user_data:
+                    # Gọi callback để set current_user
+                    self.on_register_success(user_data)
+                    # Navigate về Home được xử lý trong main.py
+                else:
+                    # Nếu auto-login fail, về trang login
+                    self.navigate("/login")
             else:
                 # Có lỗi
                 show_error(message)
@@ -207,13 +207,10 @@ class RegisterView:
                 ], alignment="center", spacing=0),
                 
                 ft.Container(height=8),
-                
-                # Title
                 ft.Text("Create member account", size=22, weight=ft.FontWeight.BOLD, text_align="center"),
-                
                 ft.Container(height=16),
                 
-                # ✅ ERROR MESSAGE
+                # ERROR MESSAGE
                 error_text,
                 ft.Container(height=8),
                 
@@ -241,24 +238,22 @@ class RegisterView:
                 
                 # Password + Confirm Password
                 ft.Row([
-                    # Password
                     ft.Container(
                         content=ft.Column([
                             ft.Text("Password", size=14, color=ft.Colors.BLACK_87),
                             ft.Container(height=4),
-                            password_container,  # ✅ Stack với text button
+                            password_container,
                         ], spacing=0, alignment="start"),
                         expand=1,
                     ),
                     
                     ft.Container(width=12),
                     
-                    # Confirm Password
                     ft.Container(
                         content=ft.Column([
                             ft.Text("Confirm password", size=14, color=ft.Colors.BLACK_87),
                             ft.Container(height=4),
-                            confirm_password_container,  # ✅ Stack với text button
+                            confirm_password_container,
                         ], spacing=0, alignment="start"),
                         expand=1,
                     ),
@@ -280,10 +275,7 @@ class RegisterView:
                 ),
                 
                 ft.Container(height=16),
-                
-                # DIVIDER
                 ft.Divider(height=1, color=ft.Colors.GREY_300),
-                
                 ft.Container(height=12),
                 
                 # Already have account
@@ -322,7 +314,6 @@ class RegisterView:
             ),
         )
         
-        # === NỀN XÁM ===
         return ft.View(
             route="/register",
             controls=[

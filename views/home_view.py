@@ -199,7 +199,9 @@ class HomeView:
         book_id = book.get("book_id")
         member_id = self.current_user.get("user_id")
         
-        success, message = borrow_book(member_id, book_id)
+        # ✅ FIX: Handle both 2-value and 3-value returns
+        result = borrow_book(member_id, book_id)
+        success, message = result[0], result[1] if len(result) >= 2 else (False, "Error")
         
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message, color=ft.Colors.WHITE),

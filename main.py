@@ -1,5 +1,5 @@
 # main.py
-import flet as ft 
+import flet as ft
 
 # Import views
 from views.home_view import HomeView
@@ -209,6 +209,9 @@ class LibraryApp:
                 target=lambda: self.check_and_show_fines(user['user_id']),
                 daemon=True
             ).start()
+        
+        # ✅ NAVIGATE VỀ HOME
+        self.navigate("/")
 
     # ================= LOGOUT =================
     

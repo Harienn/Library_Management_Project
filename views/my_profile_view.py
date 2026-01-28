@@ -155,7 +155,7 @@ class MyProfileView:
         phone = user.get("phone", "")
         gender = user.get("gender", "")
         address = user.get("address", "")
-        total_fine_debt = user.get("totalFineDebt", 0)  # ✅ Lấy số tiền phạt từ DB
+        total_fine_debt = user.get("totalFineDebt", 0)
         
         # ✅ Tạo refs cho các fields
         fullname_field = ft.Ref[ft.TextField]()
@@ -212,101 +212,166 @@ class MyProfileView:
                 save_message.current.visible = True
                 self.page.update()
 
+        # ✅ UPDATED: Tạo các field với label riêng biệt (hiển thị bên ngoài)
+        def create_labeled_field(label_text, field_widget):
+            """Helper function to create a field with external label"""
+            return ft.Column(
+                [
+                    ft.Text(
+                        label_text,
+                        size=12,
+                        color=ft.Colors.GREY_700,
+                        weight=ft.FontWeight.W_500,
+                    ),
+                    ft.Container(height=4),
+                    field_widget,
+                ],
+                spacing=0,
+            )
+
+        # Member ID field (read-only)
+        member_id_field = ft.TextField(
+            value=str(member_id),
+            read_only=True,
+            border_color=ft.Colors.GREY_300,
+            bgcolor=ft.Colors.GREY_100,
+            filled=True,
+        )
+
+        # Card status field (read-only)
+        card_status_field = ft.TextField(
+            value="Active",
+            read_only=True,
+            border_color=ft.Colors.GREY_300,
+            bgcolor=ft.Colors.GREY_100,
+            filled=True,
+        )
+
+        # Full name field
+        fullname_input = ft.TextField(
+            ref=fullname_field,
+            value=fullname,
+            hint_text="Enter your full name",
+            border_color=ft.Colors.GREY_400,
+            focused_border_color=ft.Colors.CYAN_400,
+            filled=True,
+            bgcolor=ft.Colors.WHITE,
+        )
+
+        # Email field (read-only)
+        email_input = ft.TextField(
+            value=email,
+            read_only=True,
+            border_color=ft.Colors.GREY_300,
+            bgcolor=ft.Colors.GREY_100,
+            filled=True,
+        )
+
+        # Phone field
+        phone_input = ft.TextField(
+            ref=phone_field,
+            value=phone,
+            hint_text="Enter phone number",
+            border_color=ft.Colors.GREY_400,
+            focused_border_color=ft.Colors.CYAN_400,
+            filled=True,
+            bgcolor=ft.Colors.WHITE,
+        )
+
+        # Gender dropdown
+        gender_dropdown = ft.Dropdown(
+            ref=gender_field,
+            value=gender if gender else None,
+            hint_text="Select",
+            options=[
+                ft.dropdown.Option("Male"),
+                ft.dropdown.Option("Female"),
+                ft.dropdown.Option("Other"),
+            ],
+            border_color=ft.Colors.GREY_400,
+            focused_border_color=ft.Colors.CYAN_400,
+            filled=True,
+            bgcolor=ft.Colors.WHITE,
+        )
+
+        # Address field
+        address_input = ft.TextField(
+            ref=address_field,
+            value=address,
+            hint_text="Street, district, city",
+            multiline=True,
+            min_lines=2,
+            max_lines=3,
+            border_color=ft.Colors.GREY_400,
+            focused_border_color=ft.Colors.CYAN_400,
+            filled=True,
+            bgcolor=ft.Colors.WHITE,
+        )
+
+        # Save message text
+        save_message_text = ft.Text(
+            ref=save_message,
+            visible=False,
+            size=13,
+        )
+
+        # ✅ Personal Information Card
         personal_info = ft.Container(
             content=ft.Column(
                 [
                     ft.Text("Personal information", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=16),
+                    
+                    # Row 1: Member ID and Card Status
+                    ft.Row(
+                        [
+                            ft.Container(
+                                content=create_labeled_field("Member ID", member_id_field),
+                                expand=1,
+                            ),
+                            ft.Container(
+                                content=create_labeled_field("Card status", card_status_field),
+                                expand=1,
+                            ),
+                        ],
+                        spacing=16,
+                    ),
+                    
                     ft.Container(height=12),
                     
-                    ft.Text(
-                        "",
-                        ref=save_message,
-                        size=12,
-                        visible=False,
+                    # Full name field
+                    create_labeled_field("Full name", fullname_input),
+                    
+                    ft.Container(height=12),
+                    
+                    # Email field
+                    create_labeled_field("Email address", email_input),
+                    
+                    ft.Container(height=12),
+                    
+                    # Row 2: Phone and Gender
+                    ft.Row(
+                        [
+                            ft.Container(
+                                content=create_labeled_field("Phone number", phone_input),
+                                expand=1,
+                            ),
+                            ft.Container(
+                                content=create_labeled_field("Gender", gender_dropdown),
+                                expand=1,
+                            ),
+                        ],
+                        spacing=16,
                     ),
                     
-                    ft.Row(
-                        [
-                            ft.TextField(
-                                label="Member ID",
-                                value=str(member_id),
-                                disabled=True,
-                                expand=1,
-                            ),
-                            ft.TextField(
-                                label="Card status",
-                                value="Active",
-                                disabled=True,
-                                expand=1,
-                            ),
-                        ],
-                        spacing=16,
-                    ),
-                    ft.TextField(
-                        ref=fullname_field,
-                        label="Full name", 
-                        value=fullname,
-                        hint_text="Enter your full name",
-                        border_color=ft.Colors.GREY_400,
-                        focused_border_color=ft.Colors.CYAN_400,
-                        filled=True,
-                        bgcolor=ft.Colors.GREY_50,
-                    ),
-                    ft.TextField(
-                        label="Email address", 
-                        value=email,
-                        hint_text="example@email.com",
-                        border_color=ft.Colors.GREY_400,
-                        focused_border_color=ft.Colors.CYAN_400,
-                        filled=True,
-                        bgcolor=ft.Colors.GREY_50,
-                    ),
-                    ft.Row(
-                        [
-                            ft.TextField(
-                                ref=phone_field,
-                                label="Phone number", 
-                                value=phone, 
-                                expand=1,
-                                hint_text="0912345678",
-                                border_color=ft.Colors.GREY_400,
-                                focused_border_color=ft.Colors.CYAN_400,
-                                filled=True,
-                                bgcolor=ft.Colors.GREY_50,
-                            ),
-                            ft.Dropdown(
-                                ref=gender_field,
-                                label="Gender",
-                                value=gender if gender else None,
-                                hint_text="Select your gender",
-                                options=[
-                                    ft.dropdown.Option("Male"),
-                                    ft.dropdown.Option("Female"),
-                                    ft.dropdown.Option("Other"),
-                                ],
-                                expand=1,
-                                border_color=ft.Colors.GREY_400,
-                                focused_border_color=ft.Colors.CYAN_400,
-                                filled=True,
-                                bgcolor=ft.Colors.GREY_50,
-                            ),
-                        ],
-                        spacing=16,
-                    ),
-                    ft.TextField(
-                        ref=address_field,
-                        label="Address", 
-                        value=address, 
-                        multiline=True,
-                        hint_text="Enter your address",
-                        border_color=ft.Colors.GREY_400,
-                        focused_border_color=ft.Colors.CYAN_400,
-                        min_lines=2,
-                        max_lines=3,
-                        filled=True,
-                        bgcolor=ft.Colors.GREY_50,
-                    ),
+                    ft.Container(height=12),
+                    
+                    # Address field
+                    create_labeled_field("Address", address_input),
+                    
                     ft.Container(height=16),
+                    
+                    # Save button
                     ft.FilledButton(
                         "Save changes",
                         bgcolor=ft.Colors.CYAN_400,
@@ -317,38 +382,43 @@ class MyProfileView:
                         ),
                         on_click=handle_save_profile,
                     ),
+                    
                     ft.Container(height=8),
+                    save_message_text,
+                    
+                    ft.Container(height=8),
+                    
+                    # Info message
                     ft.Text(
                         "New members must complete personal information before borrowing books.",
                         size=12,
-                        color=ft.Colors.CYAN_700,
+                        color=ft.Colors.CYAN_600,
                     ),
                 ],
-                spacing=10,
+                spacing=0,
             ),
             padding=24,
             bgcolor=ft.Colors.WHITE,
             border_radius=10,
             border=ft.Border.all(1, ft.Colors.GREY_200),
-            expand=2,
+            expand=1,
         )
 
+        # ================= CHANGE PASSWORD SECTION =================
+        
         password_error_text = ft.Text(
-            "",
-            size=12,
-            color=ft.Colors.RED_600,
             visible=False,
+            size=13,
         )
         
-        # Password fields
+        # ✅ Current Password with Show/Hide
         current_password_field = ft.TextField(
-            label="Current password",
-            hint_text="Enter your current password",
+            hint_text="Enter current password",
             password=True,
             border_color=ft.Colors.GREY_400,
             focused_border_color=ft.Colors.CYAN_400,
             filled=True,
-            bgcolor=ft.Colors.GREY_50,
+            bgcolor=ft.Colors.WHITE,
         )
         
         current_show_hide_container = ft.Container()
@@ -370,14 +440,14 @@ class MyProfileView:
         current_password_field.suffix = current_show_hide_container
         build_current_password_button()
         
+        # ✅ New Password with Show/Hide
         new_password_field = ft.TextField(
-            label="New password",
             hint_text="Enter new password (min 8 characters)",
             password=True,
             border_color=ft.Colors.GREY_400,
             focused_border_color=ft.Colors.CYAN_400,
             filled=True,
-            bgcolor=ft.Colors.GREY_50,
+            bgcolor=ft.Colors.WHITE,
         )
         
         new_show_hide_container = ft.Container()
@@ -399,14 +469,14 @@ class MyProfileView:
         new_password_field.suffix = new_show_hide_container
         build_new_password_button()
         
+        # ✅ Confirm New Password with Show/Hide
         confirm_new_password_field = ft.TextField(
-            label="Confirm new password",
             hint_text="Re-enter your new password",
             password=True,
             border_color=ft.Colors.GREY_400,
             focused_border_color=ft.Colors.CYAN_400,
             filled=True,
-            bgcolor=ft.Colors.GREY_50,
+            bgcolor=ft.Colors.WHITE,
         )
         
         confirm_show_hide_container = ft.Container()
@@ -513,20 +583,28 @@ class MyProfileView:
                 )
             )
 
+        # ✅ Change Password Card
         change_password = ft.Container(
             content=ft.Column(
                 [
                     ft.Text("Change password", size=18, weight=ft.FontWeight.BOLD),
-                    ft.Container(height=12),
+                    ft.Container(height=16),
                     
                     password_error_text,
                     ft.Container(height=8),
                     
-                    current_password_field,
-                    new_password_field,
-                    confirm_new_password_field,
-                    
+                    # Current password
+                    create_labeled_field("Current password", current_password_field),
                     ft.Container(height=12),
+                    
+                    # New password
+                    create_labeled_field("New password", new_password_field),
+                    ft.Container(height=12),
+                    
+                    # Confirm new password
+                    create_labeled_field("Confirm new password", confirm_new_password_field),
+                    
+                    ft.Container(height=16),
                     ft.FilledButton(
                         "Update password",
                         bgcolor=ft.Colors.CYAN_400,
@@ -538,9 +616,9 @@ class MyProfileView:
                         on_click=handle_change_password,
                     ),
                     ft.Container(height=16),
-                    *password_info_controls,  # ✅ Unpack danh sách động
+                    *password_info_controls,
                 ],
-                spacing=10,
+                spacing=0,
             ),
             padding=24,
             bgcolor=ft.Colors.WHITE,
@@ -554,6 +632,12 @@ class MyProfileView:
                 [
                     ft.Container(height=24),
                     ft.Text("My profile", size=26, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=4),
+                    ft.Text(
+                        "Update your personal information and change your password.",
+                        size=13,
+                        color=ft.Colors.GREY_600,
+                    ),
                     ft.Container(height=24),
                     ft.Row(
                         [
