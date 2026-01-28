@@ -1,5 +1,5 @@
 # main.py
-import flet as ft
+import flet as ft 
 
 # Import views
 from views.home_view import HomeView
