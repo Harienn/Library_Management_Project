@@ -10,17 +10,14 @@ from views.register_view import RegisterView
 from views.my_borrowing_view import MyBorrowingView
 from views.my_profile_view import MyProfileView
 from views.instruction_view import InstructionView
+from views.fine_notification_view import FineNotificationView
 
 # Import admin app
 from views.admin.admin_app import AdminApp
 
 # Auth & Authorization
-from auth_service import login_user
+from auth_service import login
 from authz import can
-
-# ✅ Import fine notification overlay (cho popup sau login)
-from components.fine_notification_overlay import show_fine_notification
-from services.borrow_service import get_member_fines
 
 
 class LibraryApp:
@@ -62,10 +59,6 @@ class LibraryApp:
             user_role = self.current_user.get("role_name", "GUEST")
             admin_app = AdminApp(self.page, user_role=user_role)
             admin_app.current_user = self.current_user
-            
-            # ✅ GÁN LOGOUT CALLBACK - QUAN TRỌNG!
-            admin_app.on_logout = self.on_logout
-            
             admin_app.navigate(route)
             return
 
@@ -94,6 +87,7 @@ class LibraryApp:
             view = LoginView(self.page, self.on_login, self.navigate)
 
         elif route == "/register":
+            # ✅ FIX: Thêm on_register_success callback
             view = RegisterView(self.page, self.navigate, self.on_register_success)
 
         elif route == "/my_borrowing":
@@ -105,37 +99,14 @@ class LibraryApp:
         elif route == "/instruction":
             view = InstructionView(self.page, self.current_user, self.navigate, self.on_logout)
 
-        # ✅ FIX: Fine notification route - Load dynamically
         elif route == "/fine_notification":
-            print("📄 Loading fine notification view...")
-            view = self.load_fine_notification_view()
-            if view is None:
-                # Fallback to my_borrowing if view not available
-                print("⚠️ Fine notification view not available, redirecting to my_borrowing")
-                self.navigate("/my_borrowing")
-                return
+            view = FineNotificationView(self.page, self.current_user, self.navigate, self.on_logout)
 
         else:
             view = HomeView(self.page, self.current_user, self.navigate, self.on_logout)
 
         self.page.views.append(view.build())
         self.page.update()
-
-    def load_fine_notification_view(self):
-        """
-        ✅ Load FineNotificationView dynamically
-        Returns None if not available
-        """
-        try:
-            from views.fine_notification_view import FineNotificationView
-            print("✅ FineNotificationView imported successfully")
-            return FineNotificationView(self.page, self.current_user, self.navigate, self.on_logout)
-        except ImportError as e:
-            print(f"❌ Cannot import FineNotificationView: {e}")
-            return None
-        except Exception as e:
-            print(f"❌ Error loading FineNotificationView: {e}")
-            return None
 
     def view_pop(self, e):
         self.page.views.pop()
@@ -146,61 +117,29 @@ class LibraryApp:
         self.page.route = route
         self.route_change(None)
 
-    # ✅ Function check fines (cho popup sau login)
-    def check_and_show_fines(self, user_id):
-        """
-        Kiểm tra và hiển thị fine notification POPUP sau login/register
-        Đây là popup overlay, khác với trang fine_notification_view
-        """
-        try:
-            import time
-            time.sleep(0.3)  # Đợi page render xong
-            
-            print(f"🔍 Checking fines for user {user_id}...")
-            
-            fine_info = get_member_fines(user_id)
-            total_unpaid = fine_info.get('total_unpaid_fines', 0)
-            
-            print(f"💰 Total unpaid fines: {total_unpaid:,.0f} VND")
-            
-            if total_unpaid > 0:
-                print("⚠️ Showing fine notification popup...")
-                show_fine_notification(self.page, fine_info)
-                print("✅ Fine notification popup displayed!")
-            else:
-                print("✅ No unpaid fines")
-                
-        except Exception as e:
-            print(f"❌ Error checking fines: {e}")
-            import traceback
-            traceback.print_exc()
-
     # ================= LOGIN =================
 
-    def on_login(self, user_data):
-        """Callback sau khi đăng nhập thành công"""
-        self.current_user = user_data
-        
-        # ✅ Check fines trong background (popup overlay)
-        if user_data and user_data.get('user_id'):
-            import threading
-            threading.Thread(
-                target=lambda: self.check_and_show_fines(user_data['user_id']),
-                daemon=True
-            ).start()
-        
-        # REDIRECT DỰA VÀO ROLE
-        role = user_data.get("role_name", "MEMBER")
-        if role in ["LIBRARIAN", "ADMIN"]:
-            self.navigate("/admin")
+    def on_login(self, email, password):
+        user = login(email, password)
+        if user:
+            self.current_user = user
+            
+            # REDIRECT DỰA VÀO ROLE
+            role = user.get("role_name", "MEMBER")
+            if role in ["LIBRARIAN", "ADMIN"]:
+                self.navigate("/admin")
+            else:
+                self.navigate("/")
         else:
-            self.navigate("/")
+            pass
 
-    # ✅ on_register_success callback
+    # ✅ THÊM: on_register_success callback
     def on_register_success(self, user):
         """Callback sau khi đăng ký thành công"""
         self.current_user = user
         print(f"✅ Registration successful for: {user.get('fullname')}")
+<<<<<<< HEAD
+=======
         
         # ✅ Check fines trong background (popup overlay)
         if user and user.get('user_id'):
@@ -212,6 +151,7 @@ class LibraryApp:
         
         # ✅ NAVIGATE VỀ HOME
         self.navigate("/")
+>>>>>>> version-2
 
     # ================= LOGOUT =================
     

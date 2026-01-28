@@ -1,5 +1,4 @@
 import flet as ft
-from auth_service import login_user
 
 
 class LoginView:
@@ -9,27 +8,6 @@ class LoginView:
         self.navigate = navigate
     
     def build(self):
-        # ✅ ERROR MESSAGE
-        error_message = ft.Text(
-            "",
-            size=13,
-            color=ft.Colors.RED_600,
-            visible=False,
-            text_align=ft.TextAlign.CENTER,
-            width=400,
-        )
-        
-        def show_error(message):
-            """Hiển thị lỗi"""
-            error_message.value = message
-            error_message.visible = True
-            self.page.update()
-        
-        def hide_error():
-            """Ẩn lỗi"""
-            error_message.visible = False
-            self.page.update()
-        
         # INPUT FIELDS
         email_field = ft.TextField(
             hint_text="Enter email",
@@ -42,76 +20,18 @@ class LoginView:
             width=400,
         )
         
-        # ✅ PASSWORD FIELD với TEXT TOGGLE
         password_field = ft.TextField(
             hint_text="Enter password",
             hint_style=ft.TextStyle(color="#c0c0c0"),
             password=True,
+            can_reveal_password=True,
             border_radius=8,
             border_color=ft.Colors.GREY_300,
             height=50,
             text_size=14,
-            content_padding=ft.Padding(left=16, right=70, top=14, bottom=14),
+            content_padding=ft.Padding(left=16, right=16, top=14, bottom=14),
             width=400,
         )
-        
-        # Text button thay cho icon
-        password_toggle_btn = ft.TextButton(
-            content=ft.Text("Show", size=13, weight=ft.FontWeight.W_500),
-            style=ft.ButtonStyle(
-                color={"": ft.Colors.CYAN_400},
-                padding=ft.padding.all(0),
-            ),
-            on_click=None,
-        )
-        
-        def toggle_password_visibility(e):
-            """Toggle hiển thị/ẩn password"""
-            if password_field.password:
-                password_field.password = False
-                password_toggle_btn.content = ft.Text("Hide", size=13, weight=ft.FontWeight.W_500)
-            else:
-                password_field.password = True
-                password_toggle_btn.content = ft.Text("Show", size=13, weight=ft.FontWeight.W_500)
-            self.page.update()
-        
-        password_toggle_btn.on_click = toggle_password_visibility
-        
-        # Stack password field với toggle button
-        password_container = ft.Stack(
-            [
-                password_field,
-                ft.Container(
-                    content=password_toggle_btn,
-                    right=10,
-                    top=10,
-                ),
-            ],
-            height=50,
-            width=400,
-        )
-        
-        # ✅ HANDLE LOGIN với AUTH SERVICE
-        def handle_login(e):
-            hide_error()
-            
-            email = email_field.value
-            password = password_field.value
-            
-            # Validate input
-            if not email or not password:
-                show_error("Please enter both email and password")
-                return
-            
-            # ✅ GỌI AUTH SERVICE
-            success, message, user_data = login_user(email, password)
-            
-            if success:
-                # ✅ Login thành công
-                self.on_login(user_data)
-            else:
-                # ❌ Hiển thị lỗi
-                show_error(message)  # "Incorrect password" hoặc "Email not found"
         
         # LABELS
         email_label = ft.Text(
@@ -137,7 +57,10 @@ class LoginView:
                 bgcolor={"": "#4BC1D2"},
                 shape=ft.RoundedRectangleBorder(radius=24),
             ),
-            on_click=handle_login,  # ✅ Dùng handle_login mới
+            on_click=lambda e: self.on_login(
+                email_field.value, 
+                password_field.value
+            ),
         )
         
         # LOGO
@@ -156,6 +79,12 @@ class LoginView:
             size=20,
             weight=ft.FontWeight.BOLD,
             color=ft.Colors.BLACK,
+        )
+        
+        # FORGOT PASSWORD
+        forgot_link = ft.TextButton(
+            content=ft.Text("Forgot password?", color="#4BC1D2"),
+            style=ft.ButtonStyle(padding=0),
         )
         
         # REGISTER LINK
@@ -179,7 +108,7 @@ class LoginView:
             on_click=lambda e: self.navigate("/"),
         )
         
-        # LOGIN CARD
+        # LOGIN CARD - KHÔNG CHO SELECT TEXT
         login_card = ft.Container(
             width=450,
             bgcolor=ft.Colors.WHITE,
@@ -190,6 +119,8 @@ class LoginView:
                 blur_radius=15,
                 color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
             ),
+            # TẮT USER SELECT
+            data={"user-select": "none"},
             content=ft.Column(
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=12,
@@ -199,9 +130,6 @@ class LoginView:
                     ft.Container(height=2),
                     title,
                     ft.Container(height=6),
-                    
-                    # ✅ ERROR MESSAGE
-                    error_message,
                     
                     # EMAIL
                     ft.Column(
@@ -213,14 +141,21 @@ class LoginView:
                         ],
                     ),
                     
-                    # PASSWORD với TEXT BUTTON
+                    # PASSWORD
                     ft.Column(
                         spacing=6,
                         horizontal_alignment=ft.CrossAxisAlignment.START,
                         controls=[
                             password_label,
-                            password_container,
+                            password_field,
                         ],
+                    ),
+                    
+                    # FORGOT PASSWORD
+                    ft.Container(
+                        content=forgot_link,
+                        alignment=ft.alignment.Alignment(1, 0),
+                        width=400,
                     ),
                     
                     ft.Container(height=2),

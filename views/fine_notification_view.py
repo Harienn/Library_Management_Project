@@ -1,245 +1,289 @@
 # views/fine_notification_view.py
 """
-Fine Notification View - Clean design như ảnh 2
-✅ Không có back button
-✅ Không có title "2.3. Fine Notification"
-✅ Chỉ hiển thị notification box
-✅ Lấy dữ liệu thật từ database
+Fine Notification View - Hiển thị thông báo phạt
+✅ Match thiết kế exactly
+✅ Responsive layout
+✅ Member info + fine details
 """
 import flet as ft
-from services.borrow_service import get_member_fines
-
-try:
-    from components.header import Header
-    from components.navbar import NavBar
-    HAS_HEADER_NAVBAR = True
-except:
-    HAS_HEADER_NAVBAR = False
-    print("⚠️ Header/NavBar not found, using simple layout")
+from services.borrow_service import get_fine_notification
+from components.header import Header
+from components.navbar import NavBar
 
 
 class FineNotificationView:
-    def __init__(self, page, current_user, navigate, on_logout):
+    def __init__(self, page: ft.Page, current_user: dict, navigate=None, on_logout=None):
         self.page = page
         self.current_user = current_user
         self.navigate = navigate
         self.on_logout = on_logout
     
     def build(self):
-        """Build fine notification view - Clean design"""
+        """Build the fine notification view"""
+        header = Header(self.page, self.current_user, self.navigate, self.on_logout)
+        navbar = NavBar(self.page, self.current_user, self.navigate, "/fine_notification")
         
-        # Content
-        if not self.current_user:
-            content = self.build_guest_view()
+        # Get fine notification data
+        fine_data = None
+        if self.current_user:
+            member_id = self.current_user.get("user_id")
+            fine_data = get_fine_notification(member_id)
+        
+        # Build content
+        if not fine_data or not fine_data.get('has_unpaid'):
+            content = self._build_no_fines_view()
         else:
-            content = self.build_member_view()
+            content = self._build_fine_notification_view(fine_data)
+        
+        main_content = ft.Column(
+            [
+                header.build(),
+                navbar.build(),
+                content,
+            ],
+            spacing=0,
+            expand=True,
+        )
         
         return ft.View(
             route="/fine_notification",
-            controls=[ft.Container(
-                content=content,
-                bgcolor=ft.Colors.WHITE,
-                expand=True,
-            )],
+            controls=[
+                ft.Container(
+                    content=main_content,
+                    bgcolor=ft.Colors.GREY_50,
+                    expand=True,
+                )
+            ],
         )
     
-    def build_guest_view(self):
-        """Guest view"""
+    def _build_no_fines_view(self):
+        """View khi không có phạt"""
         return ft.Container(
-            content=ft.Column([
-                ft.Container(height=100),
-                ft.Text("🔒", size=60),
-                ft.Container(height=20),
-                ft.Text("Please login to view fine information", 
-                    size=18, weight=ft.FontWeight.BOLD),
-                ft.Container(height=20),
-                ft.ElevatedButton(
-                    "Login",
-                    bgcolor=ft.Colors.CYAN_400,
-                    color=ft.Colors.WHITE,
-                    on_click=lambda _: self.navigate("/login") if self.navigate else None,
-                ),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=40,
+            content=ft.Column(
+                [
+                    ft.Container(height=40),
+                    ft.Text("Fine Status", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=8),
+                    ft.Text(
+                        "You have no unpaid fines. Keep up the good work!",
+                        size=14,
+                        color=ft.Colors.GREY_600,
+                    ),
+                    ft.Container(height=40),
+                    ft.Container(
+                        content=ft.Column(
+                            [
+                                ft.Icon(ft.Icons.CHECK_CIRCLE, size=64, color=ft.Colors.GREEN_400),
+                                ft.Container(height=16),
+                                ft.Text(
+                                    "All Clear!",
+                                    size=20,
+                                    weight=ft.FontWeight.BOLD,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
+                                ft.Text(
+                                    "Your account is in good standing",
+                                    size=13,
+                                    color=ft.Colors.GREY_600,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
+                            ],
+                            spacing=0,
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        padding=40,
+                        bgcolor=ft.Colors.WHITE,
+                        border_radius=10,
+                    ),
+                ],
+                scroll="auto",
+            ),
+            padding=ft.Padding(left=40, right=40, top=0, bottom=40),
             expand=True,
         )
     
-    def build_member_view(self):
-        """Member view - Clean notification box only (như ảnh 2)"""
-        user_id = self.current_user.get('user_id')
-        member_id = self.current_user.get('user_id')
-        member_name = self.current_user.get('fullname', 'N/A')
-        
-        # Get fine info from database
-        try:
-            fine_info = get_member_fines(user_id)
-            overdue_fines = fine_info.get('overdue_fines', 0)
-            damage_fines = fine_info.get('damage_fines', 0)
-            lost_fines = fine_info.get('lost_fines', 0)
-            total_unpaid = fine_info.get('total_unpaid_fines', 0)
-            
-            print(f"📊 Fine data loaded:")
-            print(f"  - Overdue: {overdue_fines:,.0f} VND")
-            print(f"  - Damage: {damage_fines:,.0f} VND")
-            print(f"  - Lost: {lost_fines:,.0f} VND")
-            print(f"  - Total: {total_unpaid:,.0f} VND")
-        except Exception as e:
-            print(f"❌ Error getting fines: {e}")
-            import traceback
-            traceback.print_exc()
-            overdue_fines = damage_fines = lost_fines = total_unpaid = 0
-        
-        # ✅ Fine breakdown rows - Always show all 3 types
-        breakdown_rows = [
-            ft.Row([
-                ft.Text("Overdue fines (unpaid)", size=14, expand=True, color="#6B7280"),
-                ft.Text(f"{overdue_fines:,.0f} VND", size=14, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            
-            ft.Row([
-                ft.Text("Damage fines (unpaid)", size=14, expand=True, color="#6B7280"),
-                ft.Text(f"{damage_fines:,.0f} VND", size=14, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            
-            ft.Row([
-                ft.Text("Lost book fines (unpaid)", size=14, expand=True, color="#6B7280"),
-                ft.Text(f"{lost_fines:,.0f} VND", size=14, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        ]
-        
-        # ✅ Fine notification badge
-        fine_badge = ft.Container(
-            content=ft.Row([
-                ft.Text("⚠️", size=16),
-                ft.Container(width=8),
-                ft.Text(
-                    "FINE NOTIFICATION",
-                    size=12,
-                    weight=ft.FontWeight.BOLD,
-                    color="#DC2626",
-                ),
-            ]),
-            padding=ft.padding.symmetric(horizontal=16, vertical=8),
-            bgcolor="#FEE2E2",
+    def _build_fine_notification_view(self, fine_data):
+        """View khi có phạt chưa thanh toán"""
+        # ⚠️ Banner
+        banner = ft.Container(
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.WARNING, size=32, color=ft.Colors.RED_700),
+                    ft.Container(width=8),
+                    ft.Text(
+                        "FINE NOTIFICATION",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.RED_700,
+                    ),
+                ],
+                spacing=0,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            padding=ft.padding.symmetric(horizontal=16, vertical=12),
+            bgcolor=ft.Colors.RED_50,
             border_radius=20,
         )
         
-        # ✅ Main notification box (như ảnh 2)
-        notification_box = ft.Container(
-            content=ft.Column([
-                # Badge
-                fine_badge,
-                ft.Container(height=24),
-                
-                # Title
-                ft.Text(
-                    "You have unpaid library fines" if total_unpaid > 0 else "Your fine information", 
-                    size=24, 
-                    weight=ft.FontWeight.BOLD,
-                    color="#1F2937",
-                ),
-                ft.Container(height=8),
-                
-                # Description
-                ft.Text(
-                    "Please review the information below. Your borrowing or extension may be blocked until fines are paid."
-                    if total_unpaid > 0 else "No outstanding fines.",
-                    size=14, 
-                    color="#9CA3AF",
-                ),
-                ft.Container(height=24),
-                
-                # Member info
-                ft.Row([
-                    ft.Text("Member ID", size=14, color="#9CA3AF", expand=True),
-                    ft.Text(str(member_id), size=14, weight=ft.FontWeight.BOLD, color="#1F2937"),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Container(height=8),
-                ft.Row([
-                    ft.Text("Member name", size=14, color="#9CA3AF", expand=True),
-                    ft.Text(member_name, size=14, weight=ft.FontWeight.BOLD, color="#1F2937"),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                
-                ft.Container(height=24),
-                
-                # ✅ Fine breakdown box (màu hồng nhạt như ảnh 2)
-                ft.Container(
-                    content=ft.Column([
-                        *breakdown_rows,
-                        ft.Container(height=8),
-                        ft.Divider(height=1, color="#F3D0D0", thickness=1),
-                        ft.Container(height=8),
-                        ft.Row([
-                            ft.Text("Total unpaid fines", size=16, weight=ft.FontWeight.BOLD, expand=True, color="#1F2937"),
-                            ft.Text(
-                                f"{total_unpaid:,.0f} VND", 
-                                size=16, 
-                                weight=ft.FontWeight.BOLD, 
-                                color="#DC2626" if total_unpaid > 0 else "#059669"
+        # Main notification card
+        notification_card = ft.Container(
+            content=ft.Column(
+                [
+                    # Title
+                    ft.Text(
+                        "You have unpaid library fines",
+                        size=20,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Container(height=8),
+                    ft.Text(
+                        "Please review the information below. Your borrowing or extension may be blocked until fines are paid.",
+                        size=13,
+                        color=ft.Colors.GREY_600,
+                    ),
+                    ft.Container(height=20),
+                    
+                    # Member info
+                    ft.Row(
+                        [
+                            ft.Column(
+                                [
+                                    ft.Text("Member ID", size=12, color=ft.Colors.GREY_700),
+                                    ft.Container(height=4),
+                                    ft.Text(
+                                        str(fine_data['member_id']),
+                                        size=14,
+                                        weight=ft.FontWeight.BOLD,
+                                    ),
+                                ],
+                                spacing=0,
+                                expand=True,
                             ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ], spacing=12),
-                    padding=24,
-                    bgcolor="#FEF2F2" if total_unpaid > 0 else "#F0FDF4",
-                    border_radius=12,
-                ),
-                
-                ft.Container(height=24),
-                
-                # Warning text
-                ft.Text(
-                    "According to the library rules, borrowing and extension can be blocked when unpaid fines exceed the allowed limit. "
-                    "Please contact the library desk to pay your fines or ask for clarification.",
-                    size=13, 
-                    color="#9CA3AF",
-                ) if total_unpaid > 0 else ft.Container(),
-                
-                ft.Container(height=24) if total_unpaid > 0 else ft.Container(height=16),
-                
-                # ✅ Action buttons (như ảnh 2)
-                ft.Row([
-                    ft.OutlinedButton(
-                        "View borrowing & fines",
-                        on_click=lambda _: self.navigate("/my_borrowing") if self.navigate else None,
-                        style=ft.ButtonStyle(
-                            color="#6B7280",
-                            side=ft.BorderSide(1, "#D1D5DB"),
-                            padding=ft.padding.symmetric(horizontal=20, vertical=12),
-                            shape=ft.RoundedRectangleBorder(radius=8),
-                        ),
+                            ft.Column(
+                                [
+                                    ft.Text("Member name", size=12, color=ft.Colors.GREY_700),
+                                    ft.Container(height=4),
+                                    ft.Text(
+                                        fine_data['member_name'],
+                                        size=14,
+                                        weight=ft.FontWeight.BOLD,
+                                    ),
+                                ],
+                                spacing=0,
+                                expand=True,
+                            ),
+                        ],
+                        spacing=20,
                     ),
-                    ft.ElevatedButton(
-                        "View library rules",
-                        bgcolor="#EF4444" if total_unpaid > 0 else ft.Colors.CYAN_400,
-                        color=ft.Colors.WHITE,
-                        on_click=lambda _: self.navigate("/instruction") if self.navigate else None,
-                        style=ft.ButtonStyle(
-                            padding=ft.padding.symmetric(horizontal=20, vertical=12),
-                            shape=ft.RoundedRectangleBorder(radius=8),
+                    ft.Container(height=20),
+                    
+                    # Fine details box
+                    ft.Container(
+                        content=ft.Column(
+                            [
+                                self._fine_row(
+                                    "Overdue fines (unpaid)",
+                                    f"{fine_data['overdue_fines']:,.0f} VND"
+                                ),
+                                self._fine_row(
+                                    "Damage fines (unpaid)",
+                                    f"{fine_data['damage_fines']:,.0f} VND"
+                                ),
+                                self._fine_row(
+                                    "Lost book fines (unpaid)",
+                                    f"{fine_data['lost_fines']:,.0f} VND"
+                                ),
+                                ft.Divider(height=16, color=ft.Colors.GREY_300),
+                                self._fine_row(
+                                    "Total unpaid fines",
+                                    f"{fine_data['total_unpaid_fines']:,.0f} VND",
+                                    is_total=True,
+                                ),
+                            ],
+                            spacing=8,
                         ),
+                        padding=20,
+                        bgcolor=ft.Colors.RED_50,
+                        border_radius=10,
                     ),
-                ], spacing=12),
-                
-            ], spacing=0),
-            padding=40,
-            bgcolor=ft.Colors.WHITE,
-            border_radius=16,
-            border=ft.Border.all(1, "#FCA5A5" if total_unpaid > 0 else "#D1FAE5"),
-            shadow=ft.BoxShadow(
-                spread_radius=0,
-                blur_radius=10,
-                color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
-                offset=ft.Offset(0, 4),
+                    ft.Container(height=20),
+                    
+                    # Info text
+                    ft.Text(
+                        "According to the library rules, borrowing and extension can be blocked when unpaid fines exceed the allowed limit. Please contact the library desk to pay your fines or ask for clarification.",
+                        size=12,
+                        color=ft.Colors.GREY_600,
+                    ),
+                    ft.Container(height=24),
+                    
+                    # Action buttons
+                    ft.Row(
+                        [
+                            ft.OutlinedButton(
+                                "View borrowing & fines",
+                                on_click=lambda _: self.navigate("/my_borrowing") if self.navigate else None,
+                                style=ft.ButtonStyle(
+                                    shape=ft.RoundedRectangleBorder(radius=24),
+                                    padding=ft.Padding(24, 12, 24, 12),
+                                ),
+                            ),
+                            ft.FilledButton(
+                                "View library rules",
+                                bgcolor=ft.Colors.RED_600,
+                                color=ft.Colors.WHITE,
+                                on_click=lambda _: self.navigate("/instruction") if self.navigate else None,
+                                style=ft.ButtonStyle(
+                                    shape=ft.RoundedRectangleBorder(radius=24),
+                                    padding=ft.Padding(24, 12, 24, 12),
+                                ),
+                            ),
+                        ],
+                        spacing=12,
+                    ),
+                ],
+                spacing=0,
             ),
+            padding=32,
+            bgcolor=ft.Colors.WHITE,
+            border_radius=12,
+            border=ft.Border.all(2, ft.Colors.RED_200),
         )
         
-        # ✅ Return only the notification box centered
         return ft.Container(
-            content=ft.Column([
-                ft.Container(height=60),
-                notification_box,
-                ft.Container(height=60),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=40,
+            content=ft.Column(
+                [
+                    ft.Container(height=24),
+                    banner,
+                    ft.Container(height=24),
+                    notification_card,
+                    ft.Container(height=40),
+                ],
+                scroll="auto",
+            ),
+            padding=ft.Padding(left=40, right=40, top=0, bottom=0),
             expand=True,
         )
+    
+    def _fine_row(self, label, value, is_total=False):
+        """Helper để tạo row hiển thị fine"""
+        if is_total:
+            return ft.Row(
+                [
+                    ft.Text(label, size=13, weight=ft.FontWeight.BOLD, expand=True),
+                    ft.Text(
+                        value,
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.RED_700,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
+        else:
+            return ft.Row(
+                [
+                    ft.Text(label, size=12, color=ft.Colors.GREY_700, expand=True),
+                    ft.Text(value, size=12, weight=ft.FontWeight.BOLD),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )

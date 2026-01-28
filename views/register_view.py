@@ -1,16 +1,16 @@
 # views/register_view.py
 import flet as ft
-from auth_service import register_user
+from auth_service import register  # ✅ IMPORT HÀM REGISTER
 
 
 class RegisterView:
     def __init__(self, page, navigate, on_register_success):
         self.page = page
         self.navigate = navigate
-        self.on_register_success = on_register_success
+        self.on_register_success = on_register_success  # ✅ CALLBACK ĐỂ SET current_user
     
     def build(self):
-        # ✅ ERROR MESSAGE
+        # ✅ THÊM ERROR MESSAGE
         error_text = ft.Text(
             "",
             size=13,
@@ -19,7 +19,7 @@ class RegisterView:
             text_align=ft.TextAlign.CENTER,
         )
         
-        # Full Name Field
+        # Form fields
         full_name_field = ft.TextField(
             hint_text="Enter full name",
             border_radius=8,
@@ -30,7 +30,6 @@ class RegisterView:
             expand=True,
         )
         
-        # Email Field
         email_field = ft.TextField(
             hint_text="Enter email",
             border_radius=8,
@@ -41,14 +40,22 @@ class RegisterView:
             expand=True,
         )
         
-        # ✅ PASSWORD FIELD với TEXT TOGGLE
         password_field = ft.TextField(
             hint_text="Enter password",
             password=True,
+<<<<<<< HEAD
+            can_reveal_password=True,
+=======
+>>>>>>> version-2
             border_radius=8,
             border_color=ft.Colors.GREY_300,
             height=50,
             text_size=14,
+<<<<<<< HEAD
+            content_padding=ft.Padding(left=16, right=16, top=0, bottom=0),
+        )
+        
+=======
             content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),
         )
         
@@ -85,13 +92,18 @@ class RegisterView:
         )
         
         # ✅ CONFIRM PASSWORD
+>>>>>>> version-2
         confirm_password_field = ft.TextField(
             hint_text="Re-enter password",
             password=True,
+            can_reveal_password=True,
             border_radius=8,
             border_color=ft.Colors.GREY_300,
             height=50,
             text_size=14,
+<<<<<<< HEAD
+            content_padding=ft.Padding(left=16, right=16, top=0, bottom=0),
+=======
             content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),
         )
         
@@ -125,6 +137,7 @@ class RegisterView:
                 ),
             ],
             height=50,
+>>>>>>> version-2
         )
         
         def show_error(message):
@@ -148,12 +161,15 @@ class RegisterView:
                 show_error("Please enter your email")
                 return
             
+<<<<<<< HEAD
+=======
             if "@" not in email_field.value:
                 show_error("Email must contain @ symbol")
                 email_field.value = ""
                 self.page.update()
                 return
             
+>>>>>>> version-2
             if not password_field.value:
                 show_error("Please enter password")
                 return
@@ -166,18 +182,34 @@ class RegisterView:
                 show_error("Passwords do not match")
                 return
             
+<<<<<<< HEAD
+            if len(password_field.value) < 6:
+                show_error("Password must be at least 6 characters")
+                return
+            
+            # ✅ GỌI HÀM REGISTER
+            result = register(
+=======
             if len(password_field.value) < 8:
                 show_error("Password must be at least 8 characters long")
                 return
             
             # ✅ ĐĂNG KÝ
             success, message = register_user(
+>>>>>>> version-2
                 full_name_field.value,
                 email_field.value,
                 password_field.value
             )
             
             # ✅ XỬ LÝ KẾT QUẢ
+<<<<<<< HEAD
+            if result and "error" not in result:
+                # Đăng ký thành công -> tự động đăng nhập
+                self.on_register_success(result)  # Set current_user
+                self.navigate("/")  # Chuyển về trang chủ
+            elif result and "error" in result:
+=======
             if success:
                 # ✅ TỰ ĐỘNG ĐĂNG NHẬP SAU KHI ĐĂNG KÝ
                 from auth_service import login_user
@@ -194,8 +226,11 @@ class RegisterView:
                     # Nếu auto-login fail, về trang login
                     self.navigate("/login")
             else:
+>>>>>>> version-2
                 # Có lỗi
-                show_error(message)
+                show_error(result["error"])
+            else:
+                show_error("Registration failed. Please try again.")
         
         # === CARD REGISTER ===
         register_card = ft.Container(
@@ -242,7 +277,11 @@ class RegisterView:
                         content=ft.Column([
                             ft.Text("Password", size=14, color=ft.Colors.BLACK_87),
                             ft.Container(height=4),
+<<<<<<< HEAD
+                            password_field,
+=======
                             password_container,
+>>>>>>> version-2
                         ], spacing=0, alignment="start"),
                         expand=1,
                     ),
@@ -253,7 +292,11 @@ class RegisterView:
                         content=ft.Column([
                             ft.Text("Confirm password", size=14, color=ft.Colors.BLACK_87),
                             ft.Container(height=4),
+<<<<<<< HEAD
+                            confirm_password_field,
+=======
                             confirm_password_container,
+>>>>>>> version-2
                         ], spacing=0, alignment="start"),
                         expand=1,
                     ),

@@ -16,60 +16,14 @@ class HomeView:
         header = Header(self.page, self.current_user, self.navigate, self.on_logout)
         navbar = NavBar(self.page, self.current_user, self.navigate, "/")
 
-        # HERO SECTION - CHỈ THAY ĐỔI PHẦN NÀY: Thêm ảnh vào container xám
+        # HERO SECTION
         hero_left = ft.Container(
-            content=ft.Stack([
-                # Ảnh thư viện
-                ft.Container(
-                    content=ft.Image(
-                        src="https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1200&q=80",
-                        fit="cover",
-                    ),
-                    width=9999,
-                    height=340,
-                ),
-                # Overlay tối để text dễ đọc
-                ft.Container(
-                    width=9999,
-                    height=340,
-                    gradient=ft.LinearGradient(
-                        begin=ft.alignment.Alignment(0, -1),
-                        end=ft.alignment.Alignment(0, 1),
-                        colors=["#00000040", "#00000070"],
-                    ),
-                ),
-                # Text
-                ft.Container(
-                    content=ft.Column([
-                        ft.Text(
-                            "Welcome to Our Library",
-                            size=32,
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.WHITE,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
-                        ft.Container(height=8),
-                        ft.Text(
-                            "Discover thousands of books and resources",
-                            size=16,
-                            color=ft.Colors.WHITE,
-                            text_align=ft.TextAlign.CENTER,
-                            opacity=0.95,
-                        ),
-                    ], 
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    width=9999,
-                    height=340,
-                ),
-            ]),
+            bgcolor=ft.Colors.GREY_300,
             border_radius=18,
             expand=2,
             height=340,
-            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
         )
 
-        # GIỮ NGUYÊN PHẦN NÀY - KHÔNG THAY ĐỔI
         hero_right = ft.Container(
             content=ft.Column([
                 ft.Text("Featured statistics", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
@@ -176,16 +130,19 @@ class HomeView:
         ], spacing=16, vertical_alignment="center")
 
     def handle_book_click(self, book):
-        """Handle click on book card to view detail"""
+        """✅ FIXED: Handle click on book card to view detail"""
         print(f"📖 Book clicked: {book.get('title')}")
         print(f"📖 Book ID: {book.get('book_id')}")
         
+        # Store in page.data
         if self.page.data is None:
             self.page.data = {}
         elif not isinstance(self.page.data, dict):
             self.page.data = {}
             
         self.page.data['selected_book'] = book
+        
+        # Navigate
         self.navigate("/book_detail")
 
     def handle_borrow_click(self, book):

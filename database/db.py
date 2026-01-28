@@ -4,11 +4,14 @@ def get_connection():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="taolao",
+        password="MyNewPass123!",
         database="LibraryDB",
         auth_plugin="mysql_native_password"
     )
-
+def get_last_insert_id():
+    sql = "SELECT LAST_INSERT_ID() AS id"
+    result = fetch_one(sql)
+    return result["id"] if result else None
 
 def fetch_all(sql, params=None):
     """

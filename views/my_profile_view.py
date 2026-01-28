@@ -2,7 +2,6 @@
 import flet as ft
 from components.header import Header
 from components.navbar import NavBar
-from services.user_service import change_password as change_user_password, update_user_profile
 
 
 class MyProfileView:
@@ -155,6 +154,8 @@ class MyProfileView:
         phone = user.get("phone", "")
         gender = user.get("gender", "")
         address = user.get("address", "")
+<<<<<<< HEAD
+=======
         total_fine_debt = user.get("totalFineDebt", 0)
         
         # ✅ Tạo refs cho các fields
@@ -211,6 +212,7 @@ class MyProfileView:
                 save_message.current.color = ft.Colors.RED_600
                 save_message.current.visible = True
                 self.page.update()
+>>>>>>> version-2
 
         # ✅ UPDATED: Tạo các field với label riêng biệt (hiển thị bên ngoài)
         def create_labeled_field(label_text, field_widget):
@@ -338,6 +340,20 @@ class MyProfileView:
                     ),
                     
                     ft.Container(height=12),
+<<<<<<< HEAD
+                    ft.Row(
+                        [
+                            ft.TextField(
+                                label="Member ID",
+                                value=str(member_id),
+                                disabled=True,
+                                expand=1,
+                            ),
+                            ft.TextField(
+                                label="Card status",
+                                value="Active",
+                                disabled=True,
+=======
                     
                     # Full name field
                     create_labeled_field("Full name", fullname_input),
@@ -358,17 +374,44 @@ class MyProfileView:
                             ),
                             ft.Container(
                                 content=create_labeled_field("Gender", gender_dropdown),
+>>>>>>> version-2
                                 expand=1,
                             ),
                         ],
                         spacing=16,
                     ),
+<<<<<<< HEAD
+                    ft.TextField(label="Full name", value=fullname),
+                    ft.TextField(label="Email address", value=email),
+                    ft.Row(
+                        [
+                            ft.TextField(
+                                label="Phone number", value=phone, expand=1
+                            ),
+                            ft.Dropdown(
+                                label="Gender",
+                                value=gender if gender else None,
+                                options=[
+                                    ft.dropdown.Option("Male"),
+                                    ft.dropdown.Option("Female"),
+                                    ft.dropdown.Option("Other"),
+                                ],
+                                expand=1,
+                            ),
+                        ],
+                        spacing=16,
+                    ),
+                    ft.TextField(
+                        label="Address", value=address, multiline=True
+                    ),
+=======
                     
                     ft.Container(height=12),
                     
                     # Address field
                     create_labeled_field("Address", address_input),
                     
+>>>>>>> version-2
                     ft.Container(height=16),
                     
                     # Save button
@@ -380,7 +423,7 @@ class MyProfileView:
                             shape=ft.RoundedRectangleBorder(radius=8),
                             padding=ft.Padding(20, 14, 20, 14),
                         ),
-                        on_click=handle_save_profile,
+                        on_click=lambda e: None,  # TODO DB
                     ),
                     
                     ft.Container(height=8),
@@ -404,6 +447,8 @@ class MyProfileView:
             expand=1,
         )
 
+<<<<<<< HEAD
+=======
         # ================= CHANGE PASSWORD SECTION =================
         
         password_error_text = ft.Text(
@@ -584,10 +629,29 @@ class MyProfileView:
             )
 
         # ✅ Change Password Card
+>>>>>>> version-2
         change_password = ft.Container(
             content=ft.Column(
                 [
                     ft.Text("Change password", size=18, weight=ft.FontWeight.BOLD),
+<<<<<<< HEAD
+                    ft.Container(height=12),
+                    ft.TextField(
+                        label="Current password",
+                        password=True,
+                        can_reveal_password=True,
+                    ),
+                    ft.TextField(
+                        label="New password",
+                        password=True,
+                        can_reveal_password=True,
+                    ),
+                    ft.TextField(
+                        label="Confirm new password",
+                        password=True,
+                        can_reveal_password=True,
+                    ),
+=======
                     ft.Container(height=16),
                     
                     password_error_text,
@@ -595,6 +659,7 @@ class MyProfileView:
                     
                     # Current password
                     create_labeled_field("Current password", current_password_field),
+>>>>>>> version-2
                     ft.Container(height=12),
                     
                     # New password
@@ -613,10 +678,21 @@ class MyProfileView:
                             shape=ft.RoundedRectangleBorder(radius=8),
                             padding=ft.Padding(20, 14, 20, 14),
                         ),
-                        on_click=handle_change_password,
+                        on_click=lambda e: None,  # TODO DB
                     ),
                     ft.Container(height=16),
+<<<<<<< HEAD
+                    ft.Text("Maximum books allowed: 10", size=13),
+                    ft.Text("Standard borrowing period: 15 days", size=13),
+                    ft.Text("Current outstanding fines: 410,000 VND", size=13),
+                    ft.Text(
+                        "Borrowing status: Blocked when fines exceed limit or books are overdue.",
+                        size=13,
+                        color=ft.Colors.RED_400,
+                    ),
+=======
                     *password_info_controls,
+>>>>>>> version-2
                 ],
                 spacing=0,
             ),

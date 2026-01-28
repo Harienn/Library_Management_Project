@@ -15,7 +15,7 @@ from authz import can
 
 
 class AdminApp:
-    def __init__(self, page, user_role="Librarian"):
+    def __init__(self, page, user_role="Admin"):
         self.page = page
         self.page.title = "LibrarySystem - Admin"
         
@@ -28,32 +28,6 @@ class AdminApp:
         
         self.current_route = "/admin"
         self.on_logout = None  # ✅ SẼ ĐƯỢC GÁN TỪ MAIN.PY
-    
-    def handle_logout(self, e=None):
-        """✅ Xử lý logout cho admin/librarian"""
-        print(f"🚪 Logging out {self.user_role}...")
-        
-        # Gọi callback logout từ main app TRƯỚC (quan trọng!)
-        if self.on_logout:
-            self.on_logout()
-        
-        # Clear admin user
-        self.current_user = None
-        
-        # Approach 1: Gọi route_change từ page
-        # Clear views và navigate về home
-        self.page.views.clear()
-        self.page.route = "/"
-        
-        # Force trigger route change event
-        if hasattr(self.page, 'on_route_change') and self.page.on_route_change:
-            # Manually trigger route change
-            class FakeEvent:
-                pass
-            self.page.on_route_change(FakeEvent())
-        else:
-            # Fallback: just update
-            self.page.update()
         
     def navigate(self, route):
         # ✅ CHECK QUYỀN TRƯỚC KHI NAVIGATE
@@ -114,9 +88,10 @@ class AdminApp:
         self.page.update()
     
     def build_page(self):
+        sidebar = Sidebar(self.current_route, self.navigate, self.user_role).build()
         # ✅ TRUYỀN LOGOUT CALLBACK CHO SIDEBAR
         sidebar_obj = Sidebar(self.current_route, self.navigate, self.user_role)
-        sidebar_obj.on_logout = self.handle_logout  # ✅ Gán logout handler
+        sidebar_obj.on_logout = self.on_logout
         sidebar_widget = sidebar_obj.build()
         
         topbar = Topbar(self.get_page_title(), self.current_user).build()
@@ -149,7 +124,7 @@ class AdminApp:
         if self.current_route == "/admin":
             return DashboardPage(self.navigate).build()
         elif self.current_route == "/admin/books":
-            return ManageBooksPage().build()
+            return ManageBooksPage().build(self.page)
         elif self.current_route == "/admin/members":
             return ManageMembersPage().build()
         elif self.current_route == "/admin/librarians":
@@ -158,7 +133,7 @@ class AdminApp:
                 return ft.Text("Access Denied", size=20, color=ft.Colors.RED_600)
             return ManageLibrariansPage().build()
         elif self.current_route == "/admin/borrow":
-            return BorrowReturnPage().build()
+            return BorrowReturnPage(self.page, self.current_user).build()
         elif self.current_route == "/admin/fines":
             return ViewFinesPage().build()
         elif self.current_route == "/admin/reports":

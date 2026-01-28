@@ -1,0 +1,12 @@
+# ===================================================
+# LIBRARY MANAGEMENT SYSTEM - DEPENDENCIES
+# ===================================================
+
+# UI Framework
+flet>=0.21.0
+
+# Database
+mysql-connector-python>=8.2.0
+
+# Optional - For better development experience
+python-dotenv>=1.0.0  # Quản lý biến môi trường

@@ -265,6 +265,10 @@ class MyBorrowingView:
                 ft.TextButton(
                     "View full history", 
                     style=ft.ButtonStyle(color="#4BC1D2"),
+<<<<<<< HEAD
+                    on_click=lambda _: self.navigate("/fine_notification") if self.navigate else None
+=======
+>>>>>>> version-2
                 ),
             ]),
             padding=15,
@@ -360,6 +364,42 @@ class MyBorrowingView:
             )
             
         except Exception as e:
+<<<<<<< HEAD
+            print(f"❌ Error: {e}")
+    
+    def _info_row(self, label, value, is_status=False, highlight=False):
+        if is_status:
+            value_widget = ft.Container(content=ft.Text(value, size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.BLUE_400, padding=ft.padding.symmetric(horizontal=12, vertical=4), border_radius=12)
+        elif highlight:
+            value_widget = ft.Text(value, size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700)
+        else:
+            value_widget = ft.Text(value, size=13, weight=ft.FontWeight.BOLD)
+        
+        return ft.Row([ft.Text(label, size=12, color=ft.Colors.GREY_700, expand=True), value_widget], 
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+    
+    def _confirm_extension(self, transaction_id, close_dialog_callback):
+        success, message, new_due = extend_borrowing(transaction_id)
+        close_dialog_callback()
+        
+        if success:
+            self._show_simple_message("Success", f"Extension successful! New due date: {self._format_date(new_due)}")
+            self.refresh_data()
+        else:
+            self._show_simple_message("Error", message)
+    
+    def _show_simple_message(self, title, message):
+        def close(e):
+            msg_dialog.open = False
+            self.page.update()
+        
+        msg_dialog = ft.AlertDialog(modal=True, title=ft.Text(title), content=ft.Text(message), 
+            actions=[ft.TextButton("OK", on_click=close)])
+        self.page.overlay.append(msg_dialog)
+        msg_dialog.open = True
+        self.page.update()
+=======
             print(f"❌ Error showing extend dialog: {e}")
             import traceback
             traceback.print_exc()
@@ -372,3 +412,4 @@ class MyBorrowingView:
             )
             self.page.snack_bar.open = True
             self.page.update()
+>>>>>>> version-2
