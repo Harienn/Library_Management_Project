@@ -18,6 +18,7 @@ class BorrowReturnPage:
         self.selected_books = []
         self.member_info = None
         self.active_transactions = []
+        self.current_transaction = None
         
     def build(self):
         # Custom tab buttons
@@ -91,6 +92,8 @@ class BorrowReturnPage:
     
     def switch_tab(self, tab_name, e):
         """Switch between tabs"""
+        print(f"=== DEBUG: Switching to tab: {tab_name} ===")
+        
         if tab_name == "borrow":
             self.current_tab = "borrow"
             self.borrow_tab_btn.bgcolor = "#FFFFFF"
@@ -110,7 +113,12 @@ class BorrowReturnPage:
             self.borrow_tab_btn.content.color = "#6B7280"
             self.content_area.content = self._build_return_content()
         
+        # Force update
+        self.borrow_tab_btn.update()
+        self.return_tab_btn.update()
+        self.content_area.update()
         self.page.update()
+        print("=== DEBUG: Tab switched successfully ===")
     
     # ============ MANAGE BORROWING BOOKS ============
     
@@ -303,13 +311,14 @@ class BorrowReturnPage:
                 self.show_error("Member not found")
                 return
             
-            # Get current borrowing count - SỬA: dùng BORROWING_TRANSACTION thay vì TRANSACTIONS
+            # Get current borrowing count
             borrow_count = fetch_one("""
                 SELECT COUNT(*) as count 
                 FROM BORROWING_TRANSACTION bt
                 JOIN BORROWING_TRANSACTION_DETAILS btd ON bt.transaction_id = btd.transaction_id
                 WHERE bt.member_id = %s 
                 AND bt.borrower_status IN ('BORROWED', 'OVERDUE')
+                AND btd.item_status = 'BORROWED'
             """, (member['user_id'],))
             
             self.member_info = member
@@ -350,10 +359,10 @@ class BorrowReturnPage:
                 # Row 3: Account status và Address
                 ft.Row([
                     ft.Row([
-                        ft.Text("Account status:", size=12, color="#6B7280, weight=ft.FontWeight.W_600"),
+                        ft.Text("Account status:", size=12, color="#6B7280", weight=ft.FontWeight.W_600),
                         ft.Container(
                             content=ft.Text(
-                                member['user_status'] if 'user_status' in member else member.get('status', 'ACTIVE'), 
+                                member.get('user_status', member.get('status', 'ACTIVE')), 
                                 size=11, 
                                 color="#059669" if (member.get('user_status') or member.get('status')) == 'ACTIVE' else "#DC2626",
                                 weight=ft.FontWeight.W_500
@@ -556,7 +565,14 @@ class BorrowReturnPage:
                 ft.Row([
                     ft.Text("Current borrowing", size=14, weight=ft.FontWeight.BOLD, color="#111827"),
                     ft.Container(expand=True),
-                    ft.TextButton("Go to \"Borrow / Return\"", on_click=lambda e: None),
+                    # SỬA: Thay vì dùng icon, dùng text đơn giản
+                    ft.ElevatedButton(
+                        "Refresh",
+                        bgcolor="#E5E7EB",
+                        color="#374151",
+                        height=36,
+                        on_click=lambda e: self.load_current_borrowing(),
+                    ),
                 ]),
                 ft.Container(height=12),
                 self.current_borrowing_container,
@@ -570,7 +586,9 @@ class BorrowReturnPage:
     def load_current_borrowing(self):
         """Load current borrowing transactions from database"""
         try:
-            # SỬA: Sử dụng view vw_borrowing_details hoặc truy vấn đúng bảng
+            print("=== DEBUG: Loading current borrowing transactions ===")
+            
+            # SỬA: Dùng đúng tên column 'damage_precentage' (chính tả trong database của bạn)
             transactions = fetch_all("""
                 SELECT 
                     bt.transaction_id,
@@ -579,16 +597,32 @@ class BorrowReturnPage:
                     b.title,
                     bt.borrow_date,
                     bt.due_date,
-                    bt.borrower_status as display_status,
-                    btd.item_status
+                    bt.borrower_status,
+                    btd.item_status,
+                    btd.transaction_detail_id,
+                    btd.days_late,
+                    btd.damage_precentage,  -- SỬA: ĐÚNG TÊN COLUMN
+                    CASE 
+                        WHEN bt.borrower_status = 'RETURNED' THEN 'RETURNED'
+                        WHEN bt.borrower_status = 'BORROWED' AND bt.due_date < CURDATE() THEN 'OVERDUE'
+                        WHEN bt.borrower_status = 'BORROWED' THEN 'BORROWED'
+                        ELSE bt.borrower_status
+                    END as display_status,
+                    CASE
+                        WHEN bt.borrower_status = 'BORROWED' AND bt.due_date < CURDATE() 
+                        THEN DATEDIFF(CURDATE(), bt.due_date)
+                        ELSE 0
+                    END as days_overdue
                 FROM BORROWING_TRANSACTION bt
                 JOIN USERS u ON bt.member_id = u.user_id
                 JOIN BORROWING_TRANSACTION_DETAILS btd ON bt.transaction_id = btd.transaction_id
                 JOIN BOOKS b ON btd.book_id = b.book_id
                 WHERE bt.borrower_status IN ('BORROWED', 'OVERDUE')
-                ORDER BY bt.borrow_date DESC
-                LIMIT 10
+                ORDER BY bt.due_date ASC, bt.borrow_date DESC
+                LIMIT 20
             """)
+            
+            print(f"=== DEBUG: Found {len(transactions) if transactions else 0} transactions ===")
             
             if not transactions:
                 self.current_borrowing_container.content = ft.Column([
@@ -600,21 +634,44 @@ class BorrowReturnPage:
             
             rows = []
             for t in transactions:
-                status_color = "#059669" if t['display_status'] == 'BORROWED' else "#DC2626"
-                status_bg = "#D1FAE5" if t['display_status'] == 'BORROWED' else "#FEE2E2"
+                # Xác định trạng thái và màu sắc
+                display_status = t['display_status']
+                if display_status == 'OVERDUE':
+                    status_color = "#DC2626"
+                    status_bg = "#FEE2E2"
+                    status_text = f"OVERDUE ({t['days_overdue']} days)"
+                elif display_status == 'BORROWED':
+                    # Kiểm tra nếu sắp quá hạn (còn 2 ngày)
+                    due_date = t['due_date']
+                    if isinstance(due_date, str):
+                        due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
+                    
+                    days_remaining = (due_date - datetime.now().date()).days
+                    if days_remaining <= 2 and days_remaining >= 0:
+                        status_color = "#F59E0B"
+                        status_bg = "#FEF3C7"
+                        status_text = f"DUE IN {days_remaining} DAYS"
+                    else:
+                        status_color = "#059669"
+                        status_bg = "#D1FAE5"
+                        status_text = "BORROWED"
+                else:
+                    status_color = "#6B7280"
+                    status_bg = "#F3F4F6"
+                    status_text = display_status
                 
                 rows.append(
                     ft.DataRow(cells=[
                         ft.DataCell(ft.Text(str(t['transaction_id']), size=12, color="#374151")),
                         ft.DataCell(ft.Text(str(t['member_id']), size=12, color="#374151")),
                         ft.DataCell(ft.Text(t['member_name'], size=12, color="#374151")),
-                        ft.DataCell(ft.Text(t['title'][:30], size=12, color="#374151")),
+                        ft.DataCell(ft.Text(t['title'][:30] + "..." if len(t['title']) > 30 else t['title'], size=12, color="#374151")),
                         ft.DataCell(ft.Text(str(t['borrow_date']), size=12, color="#374151")),
                         ft.DataCell(ft.Text(str(t['due_date']), size=12, color="#374151")),
                         ft.DataCell(
                             ft.Container(
                                 content=ft.Text(
-                                    t['display_status'], 
+                                    status_text, 
                                     size=11, 
                                     color=status_color,
                                     weight=ft.FontWeight.W_500
@@ -623,6 +680,34 @@ class BorrowReturnPage:
                                 bgcolor=status_bg,
                                 border_radius=4,
                             )
+                        ),
+                        ft.DataCell(
+                            ft.Row([
+                                ft.ElevatedButton(
+                                    "View", 
+                                    bgcolor="#3B82F6",
+                                    color="#FFFFFF",
+                                    height=32,
+                                    width=80,
+                                    on_click=lambda e, tid=t['transaction_id']: self.view_transaction_details(tid)
+                                ),
+                                 ft.ElevatedButton(  # THÊM NÚT EDIT
+                                    "Edit", 
+                                    bgcolor="#F59E0B",
+                                    color="#FFFFFF",
+                                    height=32,
+                                    width=80,
+                                    on_click=lambda e, tid=t['transaction_id']: self.edit_transaction_status(tid)
+                                ),
+                                ft.ElevatedButton(
+                                    "Return", 
+                                    bgcolor="#10B981",
+                                    color="#FFFFFF",
+                                    height=32,
+                                    width=80,
+                                    on_click=lambda e, tid=t['transaction_id']: self.switch_to_return_and_search(tid)
+                                ),
+                            ], spacing=8)
                         ),
                     ])
                 )
@@ -636,6 +721,7 @@ class BorrowReturnPage:
                     ft.DataColumn(ft.Text("BORROWED", size=11, color="#6B7280", weight=ft.FontWeight.W_600)),
                     ft.DataColumn(ft.Text("DUE DATE", size=11, color="#6B7280", weight=ft.FontWeight.W_600)),
                     ft.DataColumn(ft.Text("STATUS", size=11, color="#6B7280", weight=ft.FontWeight.W_600)),
+                    ft.DataColumn(ft.Text("ACTIONS", size=11, color="#6B7280", weight=ft.FontWeight.W_600)),
                 ],
                 rows=rows,
                 border=ft.border.all(1, "#E5E7EB"),
@@ -646,10 +732,93 @@ class BorrowReturnPage:
             
             if hasattr(self, 'page'):
                 self.page.update()
+                print("=== DEBUG: Current borrowing table updated ===")
                 
         except Exception as ex:
             print(f"Error loading current borrowing: {ex}")
+            import traceback
+            traceback.print_exc()
             self.current_borrowing_container.content = ft.Text(f"Error: {str(ex)}", size=12, color="#DC2626")
+            if hasattr(self, 'page'):
+                self.page.update()
+    
+    def view_transaction_details(self, transaction_id):
+        """View transaction details"""
+        print(f"=== DEBUG: Viewing transaction {transaction_id} ===")
+        self.show_success(f"Viewing transaction {transaction_id}")
+    def edit_transaction_status(self, transaction_id):
+        """Open dialog to edit transaction status"""
+        self.editing_transaction_id = transaction_id
+        
+        # Tạo dropdown cho status
+        status_dropdown = ft.Dropdown(
+            label="Status",
+            options=[
+                ft.dropdown.Option("BORROWED"),
+                ft.dropdown.Option("OVERDUE"),
+                ft.dropdown.Option("RETURNED"),
+            ],
+            width=200,
+            value="BORROWED",  # giá trị mặc định
+        )
+        
+        def save_status(e):
+            new_status = status_dropdown.value
+            if new_status:
+                try:
+                    execute(
+                        "UPDATE BORROWING_TRANSACTION SET borrower_status = %s WHERE transaction_id = %s",
+                        (new_status, transaction_id)
+                    )
+                    self.show_success(f"✅ Transaction {transaction_id} updated to {new_status}")
+                    self.load_current_borrowing()  # Refresh table
+                    self.page.dialog.open = False
+                    self.page.update()
+                except Exception as ex:
+                    self.show_error(f"Error updating status: {str(ex)}")
+        
+        def cancel_dialog(e):
+            self.page.dialog.open = False
+            self.page.update()
+        
+        # Tạo dialog
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(f"Edit Transaction #{transaction_id}"),
+            content=ft.Column([
+                ft.Text("Select new status:", size=14),
+                ft.Container(height=10),
+                status_dropdown,
+            ], height=100, width=300),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel_dialog),
+                ft.TextButton("Save", on_click=save_status),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.dialog = dialog
+        self.page.dialog.open = True
+        self.page.update()
+    
+    def switch_to_return_and_search(self, transaction_id):
+        """Switch to Return tab and search for transaction"""
+        print(f"=== DEBUG: Switching to return tab with transaction {transaction_id} ===")
+        
+        # Chuyển sang tab Return
+        self.switch_tab("return", None)
+        
+        # Tự động điền transaction ID và tìm kiếm
+        self.return_transaction_field.value = str(transaction_id)
+        
+        # Tạm thời đợi một chút để UI cập nhật
+        import time
+        time.sleep(0.5)
+        
+        # Gọi hàm search
+        self.search_transaction(None)
+        
+        self.show_success(f"Loaded transaction {transaction_id} for return")
     
     # ============ MANAGE RETURN BOOKS ============
     
@@ -718,6 +887,8 @@ class BorrowReturnPage:
     
     def search_transaction(self, e):
         """Search transaction by ID"""
+        print("=== DEBUG: search_transaction called ===")
+        
         transaction_id = self.return_transaction_field.value
         
         if not transaction_id or not transaction_id.isdigit():
@@ -725,7 +896,9 @@ class BorrowReturnPage:
             return
         
         try:
-            # SỬA: Sử dụng BORROWING_TRANSACTION thay vì TRANSACTIONS
+            print(f"=== DEBUG: Searching for transaction {transaction_id} ===")
+            
+            # SỬA: Dùng đúng tên column 'damage_precentage'
             transaction = fetch_one("""
                 SELECT 
                     bt.transaction_id,
@@ -741,10 +914,13 @@ class BorrowReturnPage:
                     b.title,
                     a.author_name as author,
                     btd.item_status,
-                    btd.damage_percentage,
+                    btd.damage_precentage,  -- SỬA: ĐÚNG TÊN COLUMN
                     btd.days_late,
+                    btd.transaction_detail_id,
                     CASE 
+                        WHEN bt.borrower_status = 'RETURNED' THEN 'RETURNED'
                         WHEN bt.borrower_status = 'BORROWED' AND bt.due_date < CURDATE() THEN 'OVERDUE'
+                        WHEN bt.borrower_status = 'BORROWED' THEN 'BORROWED'
                         ELSE bt.borrower_status
                     END as display_status,
                     CASE
@@ -763,13 +939,15 @@ class BorrowReturnPage:
                 JOIN BOOKS b ON btd.book_id = b.book_id
                 LEFT JOIN AUTHORS a ON b.author_id = a.author_id
                 WHERE bt.transaction_id = %s
-                AND bt.borrower_status = 'BORROWED'
+                AND bt.borrower_status IN ('BORROWED', 'OVERDUE')
                 LIMIT 1
             """, (transaction_id,))
             
             if not transaction:
                 self.show_error("Transaction not found or book already returned")
                 return
+            
+            print(f"=== DEBUG: Transaction found: {transaction['title']} ===")
             
             # Display transaction details
             status_color = "#059669" if transaction['display_status'] == 'BORROWED' else "#DC2626"
@@ -839,7 +1017,7 @@ class BorrowReturnPage:
                     ft.Container(
                         content=ft.Column([
                             ft.Text("⚠️ OVERDUE", size=12, color="#DC2626", weight=ft.FontWeight.W_600),
-                            ft.Text(f"Days overdue: {transaction['days_overdue']}", size=12, color="#DC2626"),
+                            ft.Text(f"Days overdue: {transaction['days_overdue']} days", size=12, color="#DC2626"),
                             ft.Text(f"Estimated fine: {transaction['estimated_fine']:,.0f} VND", size=12, color="#DC2626", weight=ft.FontWeight.W_600),
                         ], spacing=4),
                         padding=12,
@@ -851,10 +1029,18 @@ class BorrowReturnPage:
             self.transaction_details.content = details_content
             self.return_book_btn.visible = True
             self.current_transaction = transaction
+            
+            # Force update
+            self.transaction_details.update()
+            self.return_book_btn.update()
             self.page.update()
+            
+            self.show_success(f"Transaction {transaction_id} loaded successfully")
             
         except Exception as ex:
             print(f"Error searching transaction: {ex}")
+            import traceback
+            traceback.print_exc()
             self.show_error(f"Error: {str(ex)}")
     
     def process_return(self, e):
@@ -863,43 +1049,61 @@ class BorrowReturnPage:
             self.show_error("No transaction selected")
             return
         
+        print(f"=== DEBUG: Processing return for transaction {self.current_transaction['transaction_id']} ===")
+        
         try:
             result = return_book(self.current_transaction['transaction_id'])
             
             if result['success']:
                 fine_msg = f" Fine charged: {result['fine_amount']:,.0f} VND" if result['fine_amount'] > 0 else ""
-                self.show_success(f"Book returned successfully!{fine_msg}")
+                self.show_success(f"✅ Book returned successfully!{fine_msg}")
                 
                 # Reset form
                 self.return_transaction_field.value = ""
                 self.transaction_details.content = ft.Text("Enter transaction ID to view details", size=12, color="#9CA3AF")
                 self.return_book_btn.visible = False
-                self.current_transaction = None
+                
+                # Cập nhật current borrowing table
                 self.load_current_borrowing()
+                
+                # Force update
+                self.transaction_details.update()
+                self.return_book_btn.update()
                 self.page.update()
+                
+                # Nếu đang ở tab Borrow, refresh lại table
+                if self.current_tab == "borrow":
+                    self.load_current_borrowing()
+                    
             else:
-                self.show_error(result['message'])
+                self.show_error(f"❌ {result['message']}")
                 
         except Exception as ex:
             print(f"Error processing return: {ex}")
-            self.show_error(f"Error: {str(ex)}")
+            import traceback
+            traceback.print_exc()
+            self.show_error(f"❌ Error: {str(ex)}")
     
     # ============ HELPER METHODS ============
     
     def show_success(self, message):
         """Show success snackbar"""
+        print(f"=== DEBUG show_success: {message} ===")
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message, color="#FFFFFF"),
             bgcolor="#10B981",
+            duration=3000,
         )
         self.page.snack_bar.open = True
         self.page.update()
     
     def show_error(self, message):
         """Show error snackbar"""
+        print(f"=== DEBUG show_error: {message} ===")
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message, color="#FFFFFF"),
             bgcolor="#EF4444",
+            duration=3000,
         )
         self.page.snack_bar.open = True
         self.page.update()
