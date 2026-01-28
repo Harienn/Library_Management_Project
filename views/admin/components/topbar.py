@@ -7,14 +7,14 @@ class Topbar:
         self.user_info = user_info
     
     def build(self):
-        # LẤY THÔNG TIN USER
+        # ✅ LẤY THÔNG TIN USER
         user_name = self.user_info.get("name", "User")
         user_role = self.user_info.get("role_name", "GUEST")
         
-        # LẤY CHỮ CÁI ĐẦU CỦA TÊN
+        # ✅ LẤY CHỮ CÁI ĐẦU CỦA TÊN
         initial = user_name[0].upper() if user_name else "U"
         
-        # MÀU AVATAR DỰA VÀO ROLE
+        # ✅ MÀU AVATAR DỰA VÀO ROLE
         avatar_color = ft.Colors.CYAN_400 if user_role == "ADMIN" else ft.Colors.BLUE_400
         
         return ft.Container(
@@ -25,7 +25,7 @@ class Topbar:
                 ], spacing=4),
                 ft.Container(expand=True),
                 ft.Row([
-                    # HIỂN THỊ TÊN USER VÀ ROLE
+                    # ✅ HIỂN THỊ TÊN USER VÀ ROLE
                     ft.Column([
                         ft.Text(user_name, size=13, weight=ft.FontWeight.W_500, color="#1F2937", text_align=ft.TextAlign.RIGHT),
                         ft.Text(user_role.capitalize(), size=11, color="#6B7280", text_align=ft.TextAlign.RIGHT),

@@ -1,8 +1,6 @@
 # views/book_detail_view.py
 """
-Book Detail View - GUARANTEED WORKING VERSION v3
-✅ Dùng Container overlay thay vì AlertDialog
-✅ Đảm bảo 100% hiển thị được
+Book Detail View - Complete with all sections
 """
 import flet as ft
 from database.db import fetch_one, fetch_all
@@ -104,7 +102,7 @@ class BookDetailView:
             same_genre = self.build_same_genre()
             
             print("📦 Building header...")
-            # Simple header
+            # Simple header (NO ICONS)
             user_name = "Guest"
             if self.current_user:
                 user_name = self.current_user.get('fullname', 'User')
@@ -156,7 +154,7 @@ class BookDetailView:
             return self.build_error_view(str(e))
 
     def build_error_view(self, error_msg=None):
-        """Build error view"""
+        """Build error view (NO ICONS)"""
         return ft.View(
             "/book_detail",
             [ft.Container(
@@ -206,70 +204,120 @@ class BookDetailView:
         cover_url = self.book_data.get("image_url")
         if cover_url:
             try:
-                cover = ft.Container(
-                    content=ft.Image(src=cover_url, fit=ft.ImageFit.COVER),
-                    width=250,
-                    height=350,
-                    border_radius=10,
-                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-                    border=ft.Border.all(1, ft.Colors.GREY_300),
+                cover_content = ft.Image(
+                    src=cover_url,
+                    width=200,
+                    height=300,
+                    fit=ft.ImageFit.COVER,
                 )
             except:
-                cover = ft.Container(
+                cover_content = ft.Container(
                     content=ft.Text("📚", size=80),
-                    width=250,
-                    height=350,
-                    bgcolor=ft.Colors.GREY_200,
-                    border_radius=10,
+                    width=200,
+                    height=300,
+                    bgcolor="#B2EBF2",
                     alignment=ft.Alignment(0, 0),
                 )
         else:
-            cover = ft.Container(
+            cover_content = ft.Container(
                 content=ft.Text("📚", size=80),
-                width=250,
-                height=350,
-                bgcolor=ft.Colors.GREY_200,
-                border_radius=10,
+                width=200,
+                height=300,
+                bgcolor="#B2EBF2",
                 alignment=ft.Alignment(0, 0),
             )
         
-        # Info
-        title = self.book_data.get("title", "N/A")
-        author = self.book_data.get("author_name", "Unknown Author")
-        category = self.book_data.get("category_name", "N/A")
-        isbn = self.book_data.get("isbn", "N/A")
-        publisher = self.book_data.get("publisher", "N/A")
-        publish_date = self.book_data.get("publish_date", "N/A")
-        summary = self.book_data.get("summary", "No summary available.")
+        cover = ft.Container(
+            content=cover_content,
+            border_radius=8,
+            border=ft.border.all(1, "#E5E7EB"),
+        )
         
-        info = ft.Column([
-            ft.Text(title, size=26, weight=ft.FontWeight.BOLD, color="#111827"),
-            ft.Container(height=5),
-            ft.Text(f"by {author}", size=16, color="#6B7280"),
-            ft.Container(height=20),
-            ft.Text(f"Category: {category}", size=14, color="#374151"),
-            ft.Text(f"ISBN: {isbn}", size=14, color="#374151"),
-            ft.Text(f"Publisher: {publisher}", size=14, color="#374151"),
-            ft.Text(f"Publish date: {publish_date}", size=14, color="#374151"),
-            ft.Container(height=20),
-            ft.Text("Summary", size=16, weight=ft.FontWeight.BOLD, color="#111827"),
-            ft.Container(height=8),
-            ft.Text(summary, size=13, color="#4B5563", max_lines=6),
-            ft.Container(height=20),
-            self.build_borrow_button(available, is_reference),
-        ], spacing=0, expand=True)
+        # Badge
+        if is_reference:
+            badge_text, badge_color = "Reference Only", "#F59E0B"
+        elif available:
+            badge_text, badge_color = "Available", "#10B981"
+        else:
+            badge_text, badge_color = "Not Available", "#EF4444"
+        
+        badge = ft.Container(
+            content=ft.Text(badge_text, size=12, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+            bgcolor=badge_color,
+            padding=ft.padding.symmetric(horizontal=20, vertical=8),
+            border_radius=20,
+            margin=ft.margin.only(top=15),
+        )
+        
+        # Details
+        details = ft.Column([
+            ft.Text(self.book_data.get("title", "Unknown Title"), size=32, weight=ft.FontWeight.BOLD, color="#111827"),
+            ft.Container(height=15),
+            self.info_row("Author:", self.book_data.get("author_name") or "Unknown Author"),
+            self.info_row("Category:", self.book_data.get("category_name") or "Unknown"),
+            self.info_row("ISBN:", self.book_data.get("isbn") or "N/A"),
+            self.info_row("Published:", str(self.book_data.get("publish_date") or "N/A")),
+            self.info_row("Publisher:", self.book_data.get("publisher") or "Unknown"),
+            ft.Container(height=15),
+            self.build_tags(),
+            ft.Container(height=25),
+            self.build_borrow_section(available, is_reference),
+            ft.Container(height=25),
+            ft.Text("Summary", size=18, weight=ft.FontWeight.BOLD, color="#111827"),
+            ft.Container(height=10),
+            ft.Text(
+                self.book_data.get("summary") or "No summary available for this book.",
+                size=13,
+                color="#444"
+            ),
+        ], spacing=3)
         
         return ft.Container(
             content=ft.Row([
-                cover,
+                ft.Column([cover, badge], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Container(width=40),
-                info,
-            ], vertical_alignment=ft.CrossAxisAlignment.START, expand=True),
+                details,
+            ], vertical_alignment=ft.CrossAxisAlignment.START),
             padding=ft.padding.symmetric(horizontal=40, vertical=20),
         )
 
-    def build_borrow_button(self, available, is_reference):
-        """Build borrow button with availability check"""
+    def info_row(self, label, value):
+        """Info row helper"""
+        return ft.Row([
+            ft.Text(label, size=13, color="#666", weight=ft.FontWeight.BOLD, width=100),
+            ft.Text(str(value), size=13, color="#333"),
+        ], spacing=5)
+
+    def build_tags(self):
+        """Build category tags"""
+        category = self.book_data.get("category_name", "")
+        tags = []
+        
+        if "Văn học" in category or "Fiction" in category:
+            tags = ["Fiction", "Literature"]
+        elif "Khoa học" in category or "Science" in category:
+            tags = ["Science", "Educational"]
+        elif "Kỹ năng" in category:
+            tags = ["Self-help", "Skills"]
+        elif "Kinh tế" in category:
+            tags = ["Business", "Economics"]
+        elif category:
+            tags = [category]
+        
+        if not tags:
+            return ft.Container()
+        
+        return ft.Row([
+            ft.Container(
+                content=ft.Text(tag, size=11, color="#1E88E5"),
+                bgcolor="#E3F2FD",
+                padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                border_radius=15,
+            ) for tag in tags[:3]
+        ], spacing=10)
+
+    def build_borrow_section(self, available, is_reference):
+        """Borrow button or message"""
         if is_reference:
             return ft.Container(
                 content=ft.Text(
@@ -448,199 +496,32 @@ class BookDetailView:
         )
 
     def handle_borrow(self, e):
-        """
-        ✅ GUARANTEED WORKING v3: Handle borrow với Container overlay
-        """
-        print("🔵 handle_borrow called!")
-        
+        """Handle borrow book"""
         try:
             from services.borrow_service import borrow_book
             
             book_id = self.book_data.get("book_id")
             member_id = self.current_user.get("user_id")
             
-            print(f"📖 Attempting to borrow book_id={book_id} for member_id={member_id}")
-            
             success, message = borrow_book(member_id, book_id)
             
-            print(f"📊 Borrow result: success={success}, message={message}")
-            
-            # ✅ KIỂM TRA PROFILE INCOMPLETE
-            if not success and "profile" in message.lower():
-                print("⚠️ Profile incomplete - showing overlay")
-                self.show_profile_warning_overlay(message)
-                return
-            
-            # Hiển thị snackbar cho các case khác
-            print(f"📢 Showing snackbar: {message}")
             self.page.snack_bar = ft.SnackBar(
-                content=ft.Text(message, color=ft.Colors.WHITE, size=14),
+                content=ft.Text(message, color=ft.Colors.WHITE),
                 bgcolor=ft.Colors.GREEN_700 if success else ft.Colors.RED_700,
-                duration=3000,
             )
             self.page.snack_bar.open = True
             self.page.update()
             
             if success:
                 import time
-                time.sleep(1.5)
+                time.sleep(1)
                 self.navigate("/my_borrowing")
         
         except Exception as error:
-            print(f"❌ Error borrowing book: {error}")
-            import traceback
-            traceback.print_exc()
-            
+            print(f"Error borrowing book: {error}")
             self.page.snack_bar = ft.SnackBar(
                 content=ft.Text(f"Error: {str(error)}", color=ft.Colors.WHITE),
                 bgcolor=ft.Colors.RED_700,
-                duration=3000,
             )
             self.page.snack_bar.open = True
             self.page.update()
-    
-    def show_profile_warning_overlay(self, message):
-        """
-        ✅ GUARANTEED TO WORK: Dùng Container overlay thay vì AlertDialog
-        """
-        print("🔴 show_profile_warning_overlay called!")
-        print(f"Message: {message}")
-        
-        def close_overlay(e):
-            print("Closing overlay")
-            self.page.overlay.remove(overlay_container)
-            self.page.update()
-        
-        def go_to_profile(e):
-            print("Going to profile")
-            self.page.overlay.remove(overlay_container)
-            self.page.update()
-            self.navigate("/my_profile")
-        
-        # Tạo dialog box
-        dialog_box = ft.Container(
-            content=ft.Column([
-                # Header
-                ft.Row([
-                    ft.Text("⚠️", size=30),
-                    ft.Container(width=10),
-                    ft.Text(
-                        "Profile Incomplete",
-                        size=22,
-                        weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.GREY_900,
-                    ),
-                ], alignment=ft.MainAxisAlignment.START),
-                
-                ft.Container(height=20),
-                
-                # Error message
-                ft.Container(
-                    content=ft.Text(
-                        message,
-                        size=15,
-                        color=ft.Colors.RED_700,
-                        weight=ft.FontWeight.W_500,
-                    ),
-                    padding=15,
-                    bgcolor=ft.Colors.RED_50,
-                    border_radius=8,
-                    border=ft.Border.all(1, ft.Colors.RED_200),
-                ),
-                
-                ft.Container(height=20),
-                
-                # Description
-                ft.Text(
-                    "New members must complete personal information before borrowing books.",
-                    size=14,
-                    color=ft.Colors.GREY_700,
-                ),
-                
-                ft.Container(height=15),
-                ft.Divider(color=ft.Colors.GREY_300),
-                ft.Container(height=10),
-                
-                # Required fields
-                ft.Text(
-                    "Required information:",
-                    size=15,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.GREY_900,
-                ),
-                
-                ft.Container(height=10),
-                
-                ft.Column([
-                    ft.Row([
-                        ft.Icon(ft.Icons.CIRCLE, size=8, color=ft.Colors.CYAN_600),
-                        ft.Container(width=10),
-                        ft.Text("Full name", size=14, color=ft.Colors.GREY_700),
-                    ]),
-                    ft.Row([
-                        ft.Icon(ft.Icons.CIRCLE, size=8, color=ft.Colors.CYAN_600),
-                        ft.Container(width=10),
-                        ft.Text("Phone number", size=14, color=ft.Colors.GREY_700),
-                    ]),
-                    ft.Row([
-                        ft.Icon(ft.Icons.CIRCLE, size=8, color=ft.Colors.CYAN_600),
-                        ft.Container(width=10),
-                        ft.Text("Gender", size=14, color=ft.Colors.GREY_700),
-                    ]),
-                    ft.Row([
-                        ft.Icon(ft.Icons.CIRCLE, size=8, color=ft.Colors.CYAN_600),
-                        ft.Container(width=10),
-                        ft.Text("Address", size=14, color=ft.Colors.GREY_700),
-                    ]),
-                ], spacing=10),
-                
-                ft.Container(height=25),
-                
-                # Buttons
-                ft.Row([
-                    ft.OutlinedButton(
-                        "Cancel",
-                        on_click=close_overlay,
-                        style=ft.ButtonStyle(
-                            shape=ft.RoundedRectangleBorder(radius=8),
-                            side=ft.BorderSide(1, ft.Colors.GREY_400),
-                        ),
-                    ),
-                    ft.Container(expand=True),
-                    ft.ElevatedButton(
-                        "Complete Profile Now",
-                        bgcolor=ft.Colors.CYAN_400,
-                        color=ft.Colors.WHITE,
-                        on_click=go_to_profile,
-                        icon=ft.Icons.PERSON,
-                        style=ft.ButtonStyle(
-                            shape=ft.RoundedRectangleBorder(radius=8),
-                        ),
-                    ),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            ], spacing=0),
-            width=500,
-            padding=30,
-            bgcolor=ft.Colors.WHITE,
-            border_radius=12,
-            shadow=ft.BoxShadow(
-                spread_radius=0,
-                blur_radius=20,
-                color=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
-                offset=ft.Offset(0, 10),
-            ),
-        )
-        
-        # Overlay container (full screen with semi-transparent background)
-        overlay_container = ft.Container(
-            content=dialog_box,
-            alignment=ft.Alignment(0, 0),
-            bgcolor=ft.Colors.with_opacity(0.6, ft.Colors.BLACK),
-            expand=True,
-        )
-        
-        # Add to page overlay
-        print("Adding overlay to page...")
-        self.page.overlay.append(overlay_container)
-        self.page.update()
-        print("✅ Overlay should be visible now!")

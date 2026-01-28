@@ -1,123 +1,55 @@
-# services/auth_service.py
-"""
-Authentication Service - Xử lý đăng nhập với validation
-"""
-from database.db import fetch_one
+# auth_service.py
+from database.db import fetch_one, execute_query
 
+def login(email, password):
+    """Đăng nhập - Trả về thông tin user nếu thành công"""
+    return fetch_one(
+        """
+        SELECT * FROM USERS
+        WHERE email=%s AND password=%s
+        AND user_status='ACTIVE'
+        """,
+        (email, password)
+    )
 
-def login_user(email, password):
+def register(fullname, email, password):
     """
-    Đăng nhập user
-    
-    Args:
-        email: Email address
-        password: Password (plain text)
-        
-    Returns:
-        tuple: (success: bool, message: str, user_data: dict or None)
+    Đăng ký tài khoản mới
+    Returns: 
+        - user dict nếu thành công
+        - None nếu thất bại
     """
     try:
-        # Validate input
-        if not email or not password:
-            return False, "Please enter both email and password", None
+        # 1. Kiểm tra email đã tồn tại chưa
+        existing_user = fetch_one(
+            "SELECT email FROM USERS WHERE email=%s",
+            (email,)
+        )
         
-        # Tìm user theo email
-        query = """
-        SELECT user_id, fullname, email, password, role_name, status, 
-               phone, gender, address, totalFineDebt
-        FROM USERS
-        WHERE email = %s
-        """
-        user = fetch_one(query, (email,))
+        if existing_user:
+            return {"error": "Email already exists"}
         
-        if not user:
-            return False, "Email not found", None
+        # 2. Thêm user mới vào database
+        execute_query(
+            """
+            INSERT INTO USERS 
+            (fullname, email, password, role_name, user_status, status, created_at, totalFineDebt)
+            VALUES (%s, %s, %s, 'MEMBER', 'ACTIVE', 'ACTIVE', NOW(), 0)
+            """,
+            (fullname, email, password)
+        )
         
-        # Kiểm tra password
-        stored_password = user['password']
+        # 3. Lấy thông tin user vừa tạo để trả về (tự động đăng nhập)
+        new_user = fetch_one(
+            """
+            SELECT * FROM USERS 
+            WHERE email=%s AND password=%s
+            """,
+            (email, password)
+        )
         
-        # So sánh password (plain text)
-        if stored_password != password:
-            print(f"❌ Login failed: Incorrect password for {email}")
-            return False, "Incorrect password", None
-        
-        # Kiểm tra account status
-        if user['status'] == 'BLOCKED':
-            return False, "Account is blocked. Please contact the library.", None
-        
-        # Login thành công
-        print(f"✅ Login successful: {user['fullname']} ({email})")
-        
-        # Return user data (không bao gồm password)
-        user_data = {
-            'user_id': user['user_id'],
-            'fullname': user['fullname'],
-            'email': user['email'],
-            'role_name': user['role_name'],
-            'status': user['status'],
-            'phone': user['phone'],
-            'gender': user['gender'],
-            'address': user['address'],
-            'totalFineDebt': user['totalFineDebt']
-        }
-        
-        return True, "Login successful!", user_data
+        return new_user
         
     except Exception as e:
-        print(f"❌ Login error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False, "System error occurred", None
-
-
-def register_user(fullname, email, password, phone="", gender="", address=""):
-    """
-    Đăng ký user mới
-    
-    Returns:
-        tuple: (success: bool, message: str)
-    """
-    try:
-        from database.db import execute
-        from datetime import date
-        
-        # Validate input
-        if not fullname or not email or not password:
-            return False, "Please fill in all required fields"
-        
-        if len(password) < 8:
-            return False, "Password must be at least 8 characters"
-        
-        # Kiểm tra email đã tồn tại chưa
-        check_query = "SELECT user_id FROM USERS WHERE email = %s"
-        existing = fetch_one(check_query, (email,))
-        
-        if existing:
-            return False, "Email already exists"
-        
-        # Tạo user mới
-        insert_query = """
-        INSERT INTO USERS 
-        (fullname, email, password, created_at, status, role_name, 
-         phone, gender, address, totalFineDebt)
-        VALUES (%s, %s, %s, %s, 'ACTIVE', 'MEMBER', %s, %s, %s, 0)
-        """
-        
-        execute(insert_query, (
-            fullname,
-            email,
-            password,  # Plain text (không an toàn nhưng theo yêu cầu)
-            date.today(),
-            phone,
-            gender,
-            address
-        ))
-        
-        print(f"✅ User registered: {fullname} ({email})")
-        return True, "Registration successful!"
-        
-    except Exception as e:
-        print(f"❌ Registration error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False, f"System error: {str(e)}"
+        print(f"Register error: {e}")
+        return {"error": str(e)}

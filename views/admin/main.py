@@ -1,6 +1,6 @@
 # views/admin/main.py
 import flet as ft
-from admin_app import AdminApp
+from views.admin.admin_app import AdminApp
 
 def main(page: ft.Page):
     # Mặc định Librarian - front-end only

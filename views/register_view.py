@@ -1,16 +1,16 @@
 # views/register_view.py
 import flet as ft
-from auth_service import register_user
+from auth_service import register  # ✅ IMPORT HÀM REGISTER
 
 
 class RegisterView:
     def __init__(self, page, navigate, on_register_success):
         self.page = page
         self.navigate = navigate
-        self.on_register_success = on_register_success
+        self.on_register_success = on_register_success  # ✅ CALLBACK ĐỂ SET current_user
     
     def build(self):
-        # ✅ ERROR MESSAGE
+        # ✅ THÊM ERROR MESSAGE
         error_text = ft.Text(
             "",
             size=13,
@@ -19,7 +19,7 @@ class RegisterView:
             text_align=ft.TextAlign.CENTER,
         )
         
-        # Full Name Field
+        # Form fields
         full_name_field = ft.TextField(
             hint_text="Enter full name",
             border_radius=8,
@@ -30,7 +30,6 @@ class RegisterView:
             expand=True,
         )
         
-        # Email Field
         email_field = ft.TextField(
             hint_text="Enter email",
             border_radius=8,
@@ -41,98 +40,26 @@ class RegisterView:
             expand=True,
         )
         
-        # ✅ PASSWORD FIELD với TEXT TOGGLE
         password_field = ft.TextField(
             hint_text="Enter password",
-            password=True,  # Mặc định ẩn password
+            password=True,
+            can_reveal_password=True,
             border_radius=8,
             border_color=ft.Colors.GREY_300,
             height=50,
             text_size=14,
-            content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),  # Thêm padding phải cho button
+            content_padding=ft.Padding(left=16, right=16, top=0, bottom=0),
         )
         
-        # Text button thay cho icon
-        password_toggle_btn = ft.TextButton(
-            content=ft.Text("Show", size=13, weight=ft.FontWeight.W_500),
-            style=ft.ButtonStyle(
-                color={"": ft.Colors.CYAN_400},
-                padding=ft.padding.all(0),
-            ),
-            on_click=None,  # Sẽ set sau
-        )
-        
-        def toggle_password_visibility(e):
-            """Toggle hiển thị/ẩn password"""
-            if password_field.password:
-                # Đang ẩn → Hiện password
-                password_field.password = False
-                password_toggle_btn.content = ft.Text("Hide", size=13, weight=ft.FontWeight.W_500)
-            else:
-                # Đang hiện → Ẩn password
-                password_field.password = True
-                password_toggle_btn.content = ft.Text("Show", size=13, weight=ft.FontWeight.W_500)
-            self.page.update()
-        
-        password_toggle_btn.on_click = toggle_password_visibility
-        
-        # Stack password field với button
-        password_container = ft.Stack(
-            [
-                password_field,
-                ft.Container(
-                    content=password_toggle_btn,
-                    right=5,
-                    top=5,
-                ),
-            ],
-            height=50,
-        )
-        
-        # ✅ CONFIRM PASSWORD FIELD với TEXT TOGGLE
         confirm_password_field = ft.TextField(
             hint_text="Re-enter password",
             password=True,
+            can_reveal_password=True,
             border_radius=8,
             border_color=ft.Colors.GREY_300,
             height=50,
             text_size=14,
-            content_padding=ft.Padding(left=16, right=60, top=0, bottom=0),
-        )
-        
-        # Text button cho confirm password
-        confirm_password_toggle_btn = ft.TextButton(
-            content=ft.Text("Show", size=13, weight=ft.FontWeight.W_500),
-            style=ft.ButtonStyle(
-                color={"": ft.Colors.CYAN_400},
-                padding=ft.padding.all(0),
-            ),
-            on_click=None,
-        )
-        
-        def toggle_confirm_password_visibility(e):
-            """Toggle hiển thị/ẩn confirm password"""
-            if confirm_password_field.password:
-                confirm_password_field.password = False
-                confirm_password_toggle_btn.content = ft.Text("Hide", size=13, weight=ft.FontWeight.W_500)
-            else:
-                confirm_password_field.password = True
-                confirm_password_toggle_btn.content = ft.Text("Show", size=13, weight=ft.FontWeight.W_500)
-            self.page.update()
-        
-        confirm_password_toggle_btn.on_click = toggle_confirm_password_visibility
-        
-        # Stack confirm password field với button
-        confirm_password_container = ft.Stack(
-            [
-                confirm_password_field,
-                ft.Container(
-                    content=confirm_password_toggle_btn,
-                    right=5,
-                    top=5,
-                ),
-            ],
-            height=50,
+            content_padding=ft.Padding(left=16, right=16, top=0, bottom=0),
         )
         
         def show_error(message):
@@ -158,13 +85,6 @@ class RegisterView:
                 show_error("Please enter your email")
                 return
             
-            # ✅ VALIDATE EMAIL PHẢI CÓ DẤU @
-            if "@" not in email_field.value:
-                show_error("Email must contain @ symbol")
-                email_field.value = ""  # Xóa email không hợp lệ
-                self.page.update()
-                return
-            
             if not password_field.value:
                 show_error("Please enter password")
                 return
@@ -177,25 +97,27 @@ class RegisterView:
                 show_error("Passwords do not match")
                 return
             
-            # ✅ VALIDATE PASSWORD TỐI THIỂU 8 KÝ TỰ
-            if len(password_field.value) < 8:
-                show_error("Password must be at least 8 characters long")
+            if len(password_field.value) < 6:
+                show_error("Password must be at least 6 characters")
                 return
             
-            # ✅ GỌI HÀM REGISTER_USER
-            success, message = register_user(
+            # ✅ GỌI HÀM REGISTER
+            result = register(
                 full_name_field.value,
                 email_field.value,
                 password_field.value
             )
             
             # ✅ XỬ LÝ KẾT QUẢ
-            if success:
-                # Đăng ký thành công -> chuyển về trang login
-                self.navigate("/login")
-            else:
+            if result and "error" not in result:
+                # Đăng ký thành công -> tự động đăng nhập
+                self.on_register_success(result)  # Set current_user
+                self.navigate("/")  # Chuyển về trang chủ
+            elif result and "error" in result:
                 # Có lỗi
-                show_error(message)
+                show_error(result["error"])
+            else:
+                show_error("Registration failed. Please try again.")
         
         # === CARD REGISTER ===
         register_card = ft.Container(
@@ -246,7 +168,7 @@ class RegisterView:
                         content=ft.Column([
                             ft.Text("Password", size=14, color=ft.Colors.BLACK_87),
                             ft.Container(height=4),
-                            password_container,  # ✅ Stack với text button
+                            password_field,
                         ], spacing=0, alignment="start"),
                         expand=1,
                     ),
@@ -258,7 +180,7 @@ class RegisterView:
                         content=ft.Column([
                             ft.Text("Confirm password", size=14, color=ft.Colors.BLACK_87),
                             ft.Container(height=4),
-                            confirm_password_container,  # ✅ Stack với text button
+                            confirm_password_field,
                         ], spacing=0, alignment="start"),
                         expand=1,
                     ),

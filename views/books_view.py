@@ -285,22 +285,11 @@ class BooksView:
                     content=ft.Column([
                         ft.Icon(ft.Icons.SEARCH_OFF, size=64, color=ft.Colors.GREY_400),
                         ft.Container(height=16),
-                        ft.Text(
-                            "No matching books found for your keyword", 
-                            size=18, 
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.GREY_700,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
-                        ft.Container(height=8),
-                        ft.Text(
-                            "Try adjusting your search or filters", 
-                            size=13, 
-                            color=ft.Colors.GREY_600,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
+                        ft.Text("No books found", size=18, weight=ft.FontWeight.BOLD),
+                        ft.Text("Try adjusting your search or filters", size=13, color=ft.Colors.GREY_600),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     padding=60,
+                    alignment=ft.alignment.center,
                 )
             
             # Update pagination

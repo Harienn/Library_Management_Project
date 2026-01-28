@@ -1,13 +1,24 @@
 # views/admin/pages/manage_books.py
 import flet as ft
-
+from database.db import execute_query, fetch_one, get_last_insert_id
+from services.book_service import search_books
+from services.book_service import delete_book_by_isbn
+from services.book_service import (
+    insert_book,
+    update_book,
+    get_book_by_isbn
+)
 
 class ManageBooksPage:
     def __init__(self):
         self.current_isbn = None
         self.page_ref = None  # Thêm reference đến page
         
-    def build(self):
+
+    def build(self, page: ft.Page = None):
+        if page:
+            self.page_ref = page
+
         content = ft.Column([
             # Header
             ft.Row([
@@ -59,7 +70,8 @@ class ManageBooksPage:
         return self.main_container
     
     def reset_form(self, e=None):
-        """Reset form"""
+        """Reset form về trạng thái ban đầu"""
+        print("=== DEBUG: Resetting form ===")
         self.current_isbn = None
         self.isbn_field.value = ""
         self.title_field.value = ""
@@ -74,8 +86,27 @@ class ManageBooksPage:
         self.available_field.value = ""
         self.cover_url_field.value = ""
         self.status_field.value = "Available"
-        if e:
+        
+        # Cập nhật UI
+        if hasattr(self, 'isbn_field'):
+            self.isbn_field.update()
+            self.title_field.update()
+            self.author_field.update()
+            self.category_field.update()
+            self.summary_field.update()
+            self.publisher_field.update()
+            self.year_field.update()
+            self.pages_field.update()
+            self.price_field.update()
+            self.total_field.update()
+            self.available_field.update()
+            self.cover_url_field.update()
+            self.status_field.update()
+        
+        if e and hasattr(e, 'page'):
             e.page.update()
+        elif self.page_ref:
+            self.page_ref.update()
     
     def edit_book(self, book_data, e):
         """Load dữ liệu sách vào form và scroll lên"""
@@ -100,10 +131,7 @@ class ManageBooksPage:
         # Scroll to top - Tìm ScrollableControl và scroll lên
         # Vì page được wrap trong scroll, ta cần scroll về đầu
         try:
-            # Nếu page có scroll_to method
-            if hasattr(e.page, 'scroll_to'):
-                e.page.scroll_to(offset=0, duration=300)
-            # Hoặc scroll bằng cách update window
+            
             e.page.window_scroll_to(0, 0)
         except:
             pass
@@ -330,36 +358,40 @@ class ManageBooksPage:
         ], spacing=12)
     
     def _build_toolbar(self):
-        """Search toolbar"""
+        self.search_input = ft.TextField(
+            hint_text="Search...",
+            border_radius=999,
+            border_color="#D1D5DB",
+            text_size=14,
+            height=40,
+            expand=True,
+        )
+
+        self.search_type = ft.Dropdown(
+            options=[
+                ft.dropdown.Option("all", "All fields"),
+                ft.dropdown.Option("isbn", "ISBN"),
+                ft.dropdown.Option("title", "Title"),
+                ft.dropdown.Option("author", "Author"),
+            ],
+            value="all",
+            border_radius=999,
+            border_color="#D1D5DB",
+            text_size=13,
+            width=140,
+            height=40,
+        )
+
         return ft.Container(
             content=ft.Row([
-                ft.TextField(
-                    hint_text="",
-                    border_radius=999,
-                    border_color="#D1D5DB",
-                    text_size=14,
-                    height=40,
-                    expand=True,
-                ),
-                ft.Dropdown(
-                    options=[
-                        ft.dropdown.Option("all", "All fields"),
-                        ft.dropdown.Option("isbn", "ISBN"),
-                        ft.dropdown.Option("title", "Title"),
-                        ft.dropdown.Option("author", "Author"),
-                    ],
-                    value="all",
-                    border_radius=999,
-                    border_color="#D1D5DB",
-                    text_size=13,
-                    width=140,
-                    height=40,
-                ),
+                self.search_input,
+                self.search_type,
                 ft.ElevatedButton(
                     "Search",
                     bgcolor="#2563EB",
                     color="#FFFFFF",
                     height=40,
+                    on_click=self.search_books_action,
                 ),
             ], spacing=8),
             margin=ft.Margin(0, 10, 0, 10),
@@ -367,39 +399,37 @@ class ManageBooksPage:
     
     def _build_table(self):
         """Table với scroll ngang"""
-        books = [
-            {
-                "isbn": "978-1-9821-8582-4",
-                "title": "Chain of Gold",
-                "author": "Cassandra Clare",
-                "category": "Fantasy, Young Adult",
-                "publisher": "Margaret K. McElderry Books",
-                "year": "2020",
-                "pages": "592",
-                "price": "250000",
-                "total": "5",
-                "available": "3",
-                "status": "Available",
-            },
-            {
-                "isbn": "978-0-385-54792-5",
-                "title": "Harlem Shuffle",
-                "author": "Colson Whitehead",
-                "category": "Historical fiction",
-                "publisher": "Doubleday",
-                "year": "2021",
-                "pages": "336",
-                "price": "300000",
-                "total": "3",
-                "available": "0",
-                "status": "Not available",
-            },
-        ]
+        # === LẤY DỮ LIỆU TỪ DATABASE ===
+        result = search_books(
+            keyword=None,
+            category_id=None,
+            publish_year=None,
+            status=None,
+            page=1,
+            per_page=15
+        )
+
+        # Map dữ liệu DB -> format UI (KHÔNG SỬA UI)
+        books = []
+        for b in result["books"]:
+            books.append({
+                "isbn": b["isbn"],
+                "title": b["title"],
+                "author": b["author_name"],
+                "category": b["category_name"],
+                "publisher": b["publisher"],
+                "year": str(b["publish_date"]) if b["publish_date"] else "",
+                "pages": str(b.get("pages", "")) if "pages" in b else "",
+                "price": str(b["price"]) if b["price"] else "0",
+                "total": str(b["total_copies"]),
+                "available": str(b["available_copies"]),
+                "status": "Available" if b["availability_status"] == "AVAILABLE" else "Not available",
+            })
         
         rows = []
         for book in books:
             is_available = book["status"] == "Available"
-            price_val = int(book["price"])
+            price_val = int(float(book["price"]))
             price_formatted = f"{price_val:,}".replace(",", ".") + " đ"
             
             rows.append(
@@ -459,6 +489,7 @@ class ManageBooksPage:
                                 bgcolor="#EF4444", 
                                 color="#FFFFFF", 
                                 height=36,
+                                on_click=lambda e, b=book: self.confirm_delete(b["isbn"]),
                                 style=ft.ButtonStyle(
                                     shape=ft.RoundedRectangleBorder(radius=20),
                                     padding=ft.Padding(24, 0, 24, 0),
@@ -469,21 +500,21 @@ class ManageBooksPage:
                 ])
             )
         
-        table = ft.DataTable(
+        self.table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("IMAGE", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("ISBN", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("TITLE", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("AUTHOR", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("CATEGORY", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("PUBLISHER", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("PUBLICATION YEAR", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("PAGES", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("PRICE (VND)", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("TOTAL COPIES", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("AVAILABLE COPIES", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("STATUS", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("ACTIONS", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
+                ft.DataColumn(ft.Text("IMAGE")),
+                ft.DataColumn(ft.Text("ISBN")),
+                ft.DataColumn(ft.Text("TITLE")),
+                ft.DataColumn(ft.Text("AUTHOR")),
+                ft.DataColumn(ft.Text("CATEGORY")),
+                ft.DataColumn(ft.Text("PUBLISHER")),
+                ft.DataColumn(ft.Text("PUBLICATION YEAR")),
+                ft.DataColumn(ft.Text("PAGES")),
+                ft.DataColumn(ft.Text("PRICE (VND)")),
+                ft.DataColumn(ft.Text("TOTAL COPIES")),
+                ft.DataColumn(ft.Text("AVAILABLE COPIES")),
+                ft.DataColumn(ft.Text("STATUS")),
+                ft.DataColumn(ft.Text("ACTIONS")),
             ],
             rows=rows,
             horizontal_lines=ft.BorderSide(1, "#E5E7EB"),
@@ -491,13 +522,152 @@ class ManageBooksPage:
             data_row_min_height=56,
             column_spacing=20,
         )
+
+        return ft.Row([self.table], scroll=ft.ScrollMode.AUTO)
         
-        # Wrap table trong Row để scroll ngang
-        return ft.Row(
-            [table],
-            scroll=ft.ScrollMode.AUTO,
+    def search_books_action(self, e):
+        keyword = self.search_input.value.strip()
+        search_type = self.search_type.value
+
+        if not keyword:
+            self.keyword = None
+        else:
+            # search_books chỉ cần keyword, service đã search all
+            self.keyword = keyword
+
+        self.refresh_table()
+    
+    def load_books(self):
+        result = search_books(
+            keyword=None,
+            page=1,
+            per_page=50
         )
+        return result["books"]
     
     def save_book(self, e):
-        """Save book"""
-        print(f"Save: {self.isbn_field.value} - {self.title_field.value}")
+        try:
+            print("=== DEBUG: Starting save_book ===")
+            
+            data = {
+                "isbn": self.isbn_field.value.strip(),
+                "title": self.title_field.value.strip(),
+                "author": self.author_field.value.strip(),
+                "category": self.category_field.value.strip(),
+                "publisher": self.publisher_field.value.strip(),
+                "publish_year": self.year_field.value.strip(),
+                "pages": self.pages_field.value.strip(),
+                "price": self.price_field.value.strip(),
+                "total": self.total_field.value.strip(),
+                "available": self.available_field.value.strip(),
+                "summary": self.summary_field.value.strip(),
+                "cover_url": self.cover_url_field.value.strip(),
+                "status": self.status_field.value.strip(),
+            }
+            
+            print(f"=== DEBUG: Data to save: {data} ===")
+            print(f"=== DEBUG: Current ISBN: {self.current_isbn} ===")
+            
+            # Validate required fields
+            if not data["isbn"]:
+                print("=== DEBUG: ISBN is empty ===")
+                self.show_error("ISBN is required")
+                return
+                
+            if not data["title"]:
+                print("=== DEBUG: Title is empty ===")
+                self.show_error("Title is required")
+                return
+            
+            if self.current_isbn:
+                # Update existing book
+                print("=== DEBUG: Calling update_book ===")
+                success = update_book(data)
+                print(f"=== DEBUG: Update result: {success} ===")
+                if success:
+                    self.show_success("Book updated successfully")
+                    self.reset_form()
+                else:
+                    self.show_error("Failed to update book")
+            else:
+                # Insert new book
+                print("=== DEBUG: Calling insert_book ===")
+                book_id = insert_book(data)
+                print(f"=== DEBUG: Insert result - Book ID: {book_id} ===")
+                if book_id:
+                    self.show_success(f"Book added successfully (ID: {book_id})")
+                    self.reset_form()
+                else:
+                    self.show_error("Failed to add book")
+            
+            # Refresh table
+            print("=== DEBUG: Refreshing table ===")
+            self.refresh_table()
+            
+        except Exception as ex:
+            print(f"=== DEBUG: Exception in save_book: {ex} ===")
+            import traceback
+            traceback.print_exc()
+            self.show_error(f"Error saving book: {str(ex)}")
+            
+        except Exception as ex:
+            print(f"Error saving book: {ex}")
+            self.show_error(f"Error saving book: {str(ex)}")
+    
+    def delete_book(self, isbn, e):
+        delete_book_by_isbn(isbn)
+        self.page_ref.update()
+    
+    def confirm_delete(self, isbn):
+        def yes(e):
+            delete_book_by_isbn(isbn)
+            self.refresh_table()
+            self.page_ref.dialog.open = False
+
+        self.page_ref.dialog = ft.AlertDialog(
+            title=ft.Text("Confirm delete"),
+            content=ft.Text("Are you sure you want to delete this book?"),
+            actions=[
+                ft.TextButton("Cancel"),
+                ft.TextButton("Delete", on_click=yes),
+            ],
+        )
+        self.page_ref.dialog.open = True
+
+    def refresh_table(self):
+        result = search_books(
+            keyword=self.keyword if hasattr(self, "keyword") else None,
+            page=1,
+            per_page=15
+        )
+
+        # reload page
+        self.page_ref.views.clear()
+        self.page_ref.views.append(self.build(self.page_ref))
+        self.page_ref.update()
+        
+    def show_success(self, message):
+        """Hiển thị thông báo thành công"""
+        print(f"=== DEBUG show_success: {message} ===")
+        if self.page_ref:
+            self.page_ref.snack_bar = ft.SnackBar(
+                content=ft.Text(message, color="#FFFFFF"),
+                bgcolor="#10B981",
+            )
+            self.page_ref.snack_bar.open = True
+            self.page_ref.update()
+        else:
+            print("=== DEBUG: No page_ref available ===")
+
+    def show_error(self, message):
+        """Hiển thị thông báo lỗi"""
+        print(f"=== DEBUG show_error: {message} ===")
+        if self.page_ref:
+            self.page_ref.snack_bar = ft.SnackBar(
+                content=ft.Text(message, color="#FFFFFF"),
+                bgcolor="#EF4444",
+            )
+            self.page_ref.snack_bar.open = True
+            self.page_ref.update()
+        else:
+            print("=== DEBUG: No page_ref available ===")

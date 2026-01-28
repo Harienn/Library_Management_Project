@@ -1,37 +1,210 @@
-# views/admin/pages/dashboard.py
+# views/admin/pages/dashboard.py - PHIÊN BẢN ĐÃ SỬA HOÀN TOÀN
+
 import flet as ft
+from datetime import datetime, date
+import mysql.connector
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class DashboardPage:
     def __init__(self, navigate_callback):
         self.navigate = navigate_callback
+        self.db_connection = None
+        self.init_database()
+    
+    def init_database(self):
+        """Khởi tạo kết nối database"""
+        try:
+            self.db_connection = mysql.connector.connect(
+                host=os.getenv('DB_HOST', 'localhost'),
+                user=os.getenv('DB_USER', 'root'),
+                password=os.getenv('DB_PASSWORD', ''),
+                database=os.getenv('DB_NAME', 'LibraryDB'),
+                port=os.getenv('DB_PORT', 3306)
+            )
+            print("Database connected successfully for dashboard")
+        except mysql.connector.Error as err:
+            print(f"Error connecting to database: {err}")
+    
+    def get_today_transactions_count(self):
+        """Số giao dịch mượn/trả hôm nay"""
+        if not self.db_connection:
+            return 0
+        
+        try:
+            cursor = self.db_connection.cursor(dictionary=True)
+            query = """
+                SELECT COUNT(*) as count 
+                FROM BORROWING_TRANSACTION 
+                WHERE DATE(borrow_date) = CURDATE() 
+                   OR DATE(return_date) = CURDATE()
+            """
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+            return result['count'] if result else 0
+        except Exception as e:
+            print(f"Error getting today transactions: {e}")
+            return 0
+    
+    def get_current_borrowing_count(self):
+        """Số sách đang được mượn"""
+        if not self.db_connection:
+            return 0
+        
+        try:
+            cursor = self.db_connection.cursor(dictionary=True)
+            query = """
+                SELECT COUNT(*) as count
+                FROM BORROWING_TRANSACTION_DETAILS btd
+                JOIN BORROWING_TRANSACTION bt ON btd.transaction_id = bt.transaction_id
+                WHERE bt.borrower_status IN ('BORROWED', 'OVERDUE')
+            """
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+            return result['count'] if result else 0
+        except Exception as e:
+            print(f"Error getting current borrowing: {e}")
+            return 0
+    
+    def get_overdue_today_count(self):
+        """Số sách quá hạn hôm nay"""
+        if not self.db_connection:
+            return 0
+        
+        try:
+            cursor = self.db_connection.cursor(dictionary=True)
+            query = """
+                SELECT COUNT(*) as count
+                FROM BORROWING_TRANSACTION
+                WHERE borrower_status = 'OVERDUE'
+                AND due_date <= CURDATE()
+            """
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+            return result['count'] if result else 0
+        except Exception as e:
+            print(f"Error getting overdue today: {e}")
+            return 0
+    
+    def get_today_fines_amount(self):
+        """Tổng tiền phạt đã xử lý hôm nay"""
+        if not self.db_connection:
+            return "0 VND"
+        
+        try:
+            cursor = self.db_connection.cursor(dictionary=True)
+            query = """
+                SELECT COALESCE(SUM(amount), 0) as total
+                FROM FINE
+                WHERE DATE(paid_date) = CURDATE()
+                AND fine_status = 'PAID'
+            """
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+            
+            total = result['total'] if result else 0
+            return f"{total:,.0f} VND"
+        except Exception as e:
+            print(f"Error getting today fines: {e}")
+            return "0 VND"
+    
+    def get_current_borrowing_data(self):
+        """Dữ liệu sách đang mượn"""
+        if not self.db_connection:
+            return []
+        
+        try:
+            cursor = self.db_connection.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    bt.transaction_id,
+                    u.user_id as member_id,
+                    u.fullname as member_name,
+                    b.title as book_title,
+                    DATE_FORMAT(bt.borrow_date, '%d/%m/%Y') as borrow_date_formatted,
+                    DATE_FORMAT(bt.due_date, '%d/%m/%Y') as due_date_formatted,
+                    bt.borrower_status
+                FROM BORROWING_TRANSACTION bt
+                JOIN USERS u ON bt.member_id = u.user_id
+                JOIN BORROWING_TRANSACTION_DETAILS btd ON bt.transaction_id = btd.transaction_id
+                JOIN BOOKS b ON btd.book_id = b.book_id
+                WHERE bt.borrower_status IN ('BORROWED', 'OVERDUE')
+                ORDER BY bt.due_date ASC
+                LIMIT 5
+            """
+            cursor.execute(query)
+            results = cursor.fetchall()
+            cursor.close()
+            return results
+        except Exception as e:
+            print(f"Error getting current borrowing data: {e}")
+            return []
+    
+    def get_recent_fines_data(self):
+        """Dữ liệu phạt gần đây"""
+        if not self.db_connection:
+            return []
+        
+        try:
+            cursor = self.db_connection.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    u.user_id as member_id,
+                    u.fullname as member_name,
+                    bt.transaction_id,
+                    fr.violation_type,
+                    CASE
+                        WHEN fr.violation_type = 'OVERDUE' THEN CONCAT('Overdue ', btd.days_late, ' days')
+                        WHEN fr.violation_type = 'DAMAGED' THEN CONCAT('Damaged ', ROUND(btd.damage_percentage, 0), '%')
+                        WHEN fr.violation_type = 'LOST' THEN 'Lost 100%'
+                        ELSE fr.violation_type
+                    END as reason,
+                    CONCAT(FORMAT(f.amount, 0), ' VND') as amount_formatted,
+                    f.fine_status
+                FROM FINE f
+                JOIN FINE_RULES fr ON f.rule_id = fr.rule_id
+                JOIN BORROWING_TRANSACTION_DETAILS btd ON f.transaction_detail_id = btd.transaction_detail_id
+                JOIN BORROWING_TRANSACTION bt ON btd.transaction_id = bt.transaction_id
+                JOIN USERS u ON bt.member_id = u.user_id
+                ORDER BY f.created_at DESC
+                LIMIT 5
+            """
+            cursor.execute(query)
+            results = cursor.fetchall()
+            cursor.close()
+            return results
+        except Exception as e:
+            print(f"Error getting recent fines data: {e}")
+            return []
     
     def build(self):
         try:
-            # Stats cards row
+            # Lấy dữ liệu thống kê từ database
+            today_transactions = self.get_today_transactions_count()
+            current_borrowing = self.get_current_borrowing_count()
+            overdue_today = self.get_overdue_today_count()
+            today_fines = self.get_today_fines_amount()
+            
+            # Stats cards row với dữ liệu thực
             stats = ft.Row([
-                self._stat_card("Transactions today", "24", "Borrow + Return"),
-                self._stat_card("Books currently on loan", "320", "All members"),
-                self._stat_card("Overdue today", "25", "Due or overdue today"),
-                self._stat_card("Fines processed today", "420,000 VND", "Collected at this desk"),
+                self._stat_card("Transactions today", str(today_transactions), "Borrow + Return"),
+                self._stat_card("Books currently on loan", str(current_borrowing), "All members"),
+                self._stat_card("Overdue today", str(overdue_today), "Due or overdue today"),
+                self._stat_card("Fines processed today", today_fines, "Collected at this desk"),
             ], spacing=16)
             
-            # Current borrowing table
+            # Current borrowing table với dữ liệu thực
             borrowing_section = self._current_borrowing_table()
             
-            # Recent fines table
+            # Recent fines table với dữ liệu thực
             fines_section = self._recent_fines_table()
-            
-            # Current borrowing table
-            borrowing_centered = ft.Container(
-                content=borrowing_section,
-                margin=ft.Margin(100, 0, 100, 0),
-            )
-            
-            # Recent fines table centered
-            fines_centered = ft.Container(
-                content=fines_section,
-                margin=ft.Margin(100, 0, 100, 0),
-            )
             
             # Bottom row
             bottom_row = ft.Row([
@@ -41,12 +214,13 @@ class DashboardPage:
             
             return ft.Column([
                 stats,
-                borrowing_centered,
-                fines_centered,
+                borrowing_section,
+                fines_section,
                 bottom_row,
             ], spacing=16, scroll=ft.ScrollMode.AUTO)
         
         except Exception as e:
+            print(f"Error loading dashboard: {e}")
             return ft.Text(f"Error loading dashboard: {str(e)}", color="red", size=16)
     
     def _stat_card(self, title, value, subtitle):
@@ -58,21 +232,54 @@ class DashboardPage:
                 ft.Text(subtitle, size=11, color="#9CA3AF"),
             ], spacing=4),
             padding=16,
-            bgcolor=ft.Colors.WHITE,
+            bgcolor="#FFFFFF",  # MÀU TRẮNG
             border_radius=8,
-            border=ft.Border.all(1, "#E5E7EB"),
+            border=ft.border.all(1, "#E5E7EB"),
             expand=1,
         )
     
     def _current_borrowing_table(self):
-        """Current borrowing table"""
+        """Current borrowing table với dữ liệu thực"""
+        data = self.get_current_borrowing_data()
+        
+        rows = []
+        for item in data:
+            status_color = "#2563EB" if item['borrower_status'] == 'BORROWED' else "#DC2626"
+            status_text = "Borrowing" if item['borrower_status'] == 'BORROWED' else "Overdue"
+            
+            rows.append(
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(str(item['transaction_id']), size=13)),
+                    ft.DataCell(ft.Text(str(item['member_id']), size=13)),
+                    ft.DataCell(ft.Text(item['member_name'], size=13)),
+                    ft.DataCell(ft.Text(item['book_title'][:30] + "..." if len(item['book_title']) > 30 else item['book_title'], size=13)),
+                    ft.DataCell(ft.Text(item['borrow_date_formatted'], size=13)),
+                    ft.DataCell(ft.Text(item['due_date_formatted'], size=13)),
+                    ft.DataCell(ft.Text(status_text, size=13, color=status_color, weight=ft.FontWeight.W_500)),
+                ])
+            )
+        
+        # Nếu không có dữ liệu
+        if not rows:
+            rows.append(
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text("No data", size=13, color="#9CA3AF")),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                ])
+            )
+        
         return ft.Container(
             content=ft.Column([
                 ft.Row([
                     ft.Text("Current borrowing", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
                     ft.Container(expand=True),
                     ft.TextButton(
-                        content=ft.Text('Go to "Borrow / Return"', color=ft.Colors.CYAN_600, size=13),
+                        content=ft.Text('Go to "Borrow / Return"', color="#0891B2", size=13),  # MÀU CYAN
                         on_click=lambda _: self.navigate("/admin/borrow"),
                     ),
                 ]),
@@ -86,73 +293,58 @@ class DashboardPage:
                         ft.DataColumn(ft.Text("DUE DATE", size=11, weight=ft.FontWeight.BOLD, color="#6B7280")),
                         ft.DataColumn(ft.Text("STATUS", size=11, weight=ft.FontWeight.BOLD, color="#6B7280")),
                     ],
-                    rows=[
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("23", size=13)),
-                            ft.DataCell(ft.Text("123", size=13)),
-                            ft.DataCell(ft.Text("Nguyen Van A", size=13)),
-                            ft.DataCell(ft.Text("Chain of Gold", size=13)),
-                            ft.DataCell(ft.Text("01/01/2026", size=13)),
-                            ft.DataCell(ft.Text("16/01/2026", size=13)),
-                            ft.DataCell(ft.Text("Borrowing", size=13, color="#2563EB", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("15", size=13)),
-                            ft.DataCell(ft.Text("123", size=13)),
-                            ft.DataCell(ft.Text("Nguyen Van A", size=13)),
-                            ft.DataCell(ft.Text("Nona the Ninth", size=13)),
-                            ft.DataCell(ft.Text("30/12/2025", size=13)),
-                            ft.DataCell(ft.Text("14/01/2026", size=13)),
-                            ft.DataCell(ft.Text("Overdue", size=13, color="#DC2626", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("10", size=13)),
-                            ft.DataCell(ft.Text("123", size=13)),
-                            ft.DataCell(ft.Text("Nguyen Van A", size=13)),
-                            ft.DataCell(ft.Text("Financial Feminist", size=13)),
-                            ft.DataCell(ft.Text("27/12/2025", size=13)),
-                            ft.DataCell(ft.Text("11/01/2026", size=13)),
-                            ft.DataCell(ft.Text("Borrowing", size=13, color="#2563EB", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("24", size=13)),
-                            ft.DataCell(ft.Text("124", size=13)),
-                            ft.DataCell(ft.Text("Tran Thi B", size=13)),
-                            ft.DataCell(ft.Text("Database System Concepts", size=13)),
-                            ft.DataCell(ft.Text("02/01/2026", size=13)),
-                            ft.DataCell(ft.Text("17/01/2026", size=13)),
-                            ft.DataCell(ft.Text("Borrowing", size=13, color="#2563EB", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("19", size=13)),
-                            ft.DataCell(ft.Text("125", size=13)),
-                            ft.DataCell(ft.Text("Le Van C", size=13)),
-                            ft.DataCell(ft.Text("Data Structures & Algorithms", size=13)),
-                            ft.DataCell(ft.Text("26/12/2025", size=13)),
-                            ft.DataCell(ft.Text("10/01/2026", size=13)),
-                            ft.DataCell(ft.Text("Overdue", size=13, color="#DC2626", weight=ft.FontWeight.W_500)),
-                        ]),
-                    ],
-                    border=ft.Border.all(1, "#E5E7EB"),
-                    horizontal_lines=ft.BorderSide(1, "#F3F4F6"),
+                    rows=rows,
+                    border=ft.border.all(1, "#E5E7EB"),
+                    horizontal_lines=ft.border.BorderSide(1, "#F3F4F6"),
                     heading_row_color="#F9FAFB",
                 ),
             ], spacing=12),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            bgcolor="#FFFFFF",  # MÀU TRẮNG
             border_radius=8,
-            border=ft.Border.all(1, "#E5E7EB"),
+            border=ft.border.all(1, "#E5E7EB"),
         )
     
     def _recent_fines_table(self):
-        """Recent fines table"""
+        """Recent fines table với dữ liệu thực"""
+        data = self.get_recent_fines_data()
+        
+        rows = []
+        for item in data:
+            status_color = "#059669" if item['fine_status'] == 'PAID' else "#EA580C"
+            status_text = "Paid" if item['fine_status'] == 'PAID' else "Unpaid"
+            
+            rows.append(
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(str(item['member_id']), size=13)),
+                    ft.DataCell(ft.Text(item['member_name'], size=13)),
+                    ft.DataCell(ft.Text(str(item['transaction_id']), size=13)),
+                    ft.DataCell(ft.Text(item['reason'], size=13)),
+                    ft.DataCell(ft.Text(item['amount_formatted'], size=13)),
+                    ft.DataCell(ft.Text(status_text, size=13, color=status_color, weight=ft.FontWeight.W_500)),
+                ])
+            )
+        
+        # Nếu không có dữ liệu
+        if not rows:
+            rows.append(
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text("No data", size=13, color="#9CA3AF")),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                    ft.DataCell(ft.Text("", size=13)),
+                ])
+            )
+        
         return ft.Container(
             content=ft.Column([
                 ft.Row([
                     ft.Text("Recent fines", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
                     ft.Container(expand=True),
                     ft.TextButton(
-                        content=ft.Text('Go to "View fines"', color=ft.Colors.CYAN_600, size=13),
+                        content=ft.Text('Go to "View fines"', color="#0891B2", size=13),  # MÀU CYAN
                         on_click=lambda _: self.navigate("/admin/fines"),
                     ),
                 ]),
@@ -165,57 +357,16 @@ class DashboardPage:
                         ft.DataColumn(ft.Text("AMOUNT", size=11, weight=ft.FontWeight.BOLD, color="#6B7280")),
                         ft.DataColumn(ft.Text("PAYMENT STATUS", size=11, weight=ft.FontWeight.BOLD, color="#6B7280")),
                     ],
-                    rows=[
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("123", size=13)),
-                            ft.DataCell(ft.Text("Nguyen Van A", size=13)),
-                            ft.DataCell(ft.Text("5", size=13)),
-                            ft.DataCell(ft.Text("Overdue 3 days", size=13)),
-                            ft.DataCell(ft.Text("60,000 VND", size=13)),
-                            ft.DataCell(ft.Text("Paid", size=13, color="#059669", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("123", size=13)),
-                            ft.DataCell(ft.Text("Nguyen Van A", size=13)),
-                            ft.DataCell(ft.Text("3", size=13)),
-                            ft.DataCell(ft.Text("Damaged 30%", size=13)),
-                            ft.DataCell(ft.Text("90,000 VND", size=13)),
-                            ft.DataCell(ft.Text("Unpaid", size=13, color="#EA580C", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("123", size=13)),
-                            ft.DataCell(ft.Text("Nguyen Van A", size=13)),
-                            ft.DataCell(ft.Text("2", size=13)),
-                            ft.DataCell(ft.Text("Lost 100%", size=13)),
-                            ft.DataCell(ft.Text("320,000 VND", size=13)),
-                            ft.DataCell(ft.Text("Unpaid", size=13, color="#EA580C", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("124", size=13)),
-                            ft.DataCell(ft.Text("Tran Thi B", size=13)),
-                            ft.DataCell(ft.Text("18", size=13)),
-                            ft.DataCell(ft.Text("Overdue 2 days", size=13)),
-                            ft.DataCell(ft.Text("40,000 VND", size=13)),
-                            ft.DataCell(ft.Text("Unpaid", size=13, color="#EA580C", weight=ft.FontWeight.W_500)),
-                        ]),
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("125", size=13)),
-                            ft.DataCell(ft.Text("Le Van C", size=13)),
-                            ft.DataCell(ft.Text("14", size=13)),
-                            ft.DataCell(ft.Text("Overdue 5 days", size=13)),
-                            ft.DataCell(ft.Text("100,000 VND", size=13)),
-                            ft.DataCell(ft.Text("Unpaid", size=13, color="#EA580C", weight=ft.FontWeight.W_500)),
-                        ]),
-                    ],
-                    border=ft.Border.all(1, "#E5E7EB"),
-                    horizontal_lines=ft.BorderSide(1, "#F3F4F6"),
+                    rows=rows,
+                    border=ft.border.all(1, "#E5E7EB"),
+                    horizontal_lines=ft.border.BorderSide(1, "#F3F4F6"),
                     heading_row_color="#F9FAFB",
                 ),
             ], spacing=12),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            bgcolor="#FFFFFF",  # MÀU TRẮNG
             border_radius=8,
-            border=ft.Border.all(1, "#E5E7EB"),
+            border=ft.border.all(1, "#E5E7EB"),
         )
     
     def _quick_actions(self):
@@ -235,7 +386,7 @@ class DashboardPage:
                     ft.Container(expand=True),
                     ft.TextButton(
                         content=ft.Text(link_text, size=12),
-                        style=ft.ButtonStyle(color=ft.Colors.CYAN_600, padding=0),
+                        style=ft.ButtonStyle(color="#0891B2", padding=0),  # MÀU CYAN
                         on_click=lambda e, r=route: self.navigate(r),
                     ),
                 ], spacing=8, expand=True)
@@ -247,9 +398,9 @@ class DashboardPage:
                 ft.Column(action_items, spacing=8),
             ], spacing=12),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            bgcolor="#FFFFFF",  # MÀU TRẮNG
             border_radius=8,
-            border=ft.Border.all(1, "#E5E7EB"),
+            border=ft.border.all(1, "#E5E7EB"),
             expand=1,
         )
     
@@ -268,7 +419,7 @@ class DashboardPage:
         for i, (label, route) in enumerate(reports_data):
             chip = ft.Container(
                 content=ft.Text(label, size=12, color="#374151"),
-                padding=ft.Padding(12, 6, 12, 6),
+                padding=ft.padding.symmetric(horizontal=12, vertical=6),
                 bgcolor="#F3F4F6",
                 border_radius=16,
                 on_click=lambda e, r=route: self.navigate(r),
@@ -287,8 +438,14 @@ class DashboardPage:
                 ft.Row(chips_row2, spacing=8),
             ], spacing=8),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            bgcolor="#FFFFFF",  # MÀU TRẮNG
             border_radius=8,
-            border=ft.Border.all(1, "#E5E7EB"),
+            border=ft.border.all(1, "#E5E7EB"),
             expand=1,
         )
+    
+    def close_connection(self):
+        """Đóng kết nối database"""
+        if self.db_connection:
+            self.db_connection.close()
+            print("Dashboard database connection closed")

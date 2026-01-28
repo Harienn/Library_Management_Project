@@ -269,7 +269,7 @@ class MyBorrowingView:
                 ft.TextButton(
                     "View full history", 
                     style=ft.ButtonStyle(color="#4BC1D2"),
-                    on_click=self.handle_view_full_history,  # ✅ FIX: Direct method call
+                    on_click=lambda _: self.navigate("/fine_notification") if self.navigate else None
                 ),
             ]),
             padding=15,
@@ -477,13 +477,3 @@ class MyBorrowingView:
         self.page.overlay.append(msg_dialog)
         msg_dialog.open = True
         self.page.update()
-    def handle_view_full_history(self, e):
-        """✅ Handle View full history button click"""
-        print("🔍 View full history clicked!")
-        print(f"Navigate to /fine_notification")
-        
-        if self.navigate:
-            self.navigate("/fine_notification")
-        else:
-            print("❌ Navigate function not available")
-            self._show_simple_message("Error", "Navigation not available")

@@ -1,12 +1,46 @@
 # views/admin/pages/manage_members.py
-import flet as ft
 
+import flet as ft
+from database.db import get_connection
+from services.member_service import fetch_all_members, insert_member, update_member
+from services.member_service import (
+    fetch_all_members,
+    insert_member,
+    update_member,
+)
 
 class ManageMembersPage:
     def __init__(self):
         self.current_member_id = None
+        self.page_ref = None
+
+    def set_page(self, page):
+        """Set page reference để hiển thị snackbar"""
+        self.page_ref = page
+    
+    def show_success(self, message):
+        """Hiển thị thông báo thành công"""
+        if self.page_ref:
+            self.page_ref.snack_bar = ft.SnackBar(
+                content=ft.Text(message, color="#FFFFFF"),
+                bgcolor="#10B981",
+            )
+            self.page_ref.snack_bar.open = True
+            self.page_ref.update()
+    
+    def show_error(self, message):
+        """Hiển thị thông báo lỗi"""
+        if self.page_ref:
+            self.page_ref.snack_bar = ft.SnackBar(
+                content=ft.Text(message, color="#FFFFFF"),
+                bgcolor="#EF4444",
+            )
+            self.page_ref.snack_bar.open = True
+            self.page_ref.update()
         
-    def build(self):
+    def build(self, page: ft.Page = None):
+        if page:
+            self.page_ref = page
         content = ft.Column([
             # Header
             ft.Row([
@@ -48,7 +82,7 @@ class ManageMembersPage:
         
         self.main_container = ft.Container(
             content=content,
-            padding=ft.Padding(14, 14, 16, 16),
+            padding=ft.padding.all(16),
             bgcolor="#FFFFFF",
             border_radius=14,
             border=ft.Border.all(1, "#E5E7EB"),
@@ -256,152 +290,182 @@ class ManageMembersPage:
                     height=40,
                 ),
             ], spacing=8),
-            margin=ft.Margin(0, 10, 0, 10),
+            margin=ft.margin.symmetric(vertical=10),  # SỬA: ft.margin thay vì ft.Margin
         )
-    
     def _build_table(self):
-        """Table với scroll ngang"""
-        members = [
-            {
-                "number": "1",
-                "member_id": "123",
-                "fullname": "Nguyen Van A",
-                "email": "memberA@example.com",
-                "phone": "0901234567",
-                "gender": "Male",
-                "address": "123 Le Loi, District 1, HCMC",
-                "status": "Temporarily Locked",
-            },
-            {
-                "number": "2",
-                "member_id": "124",
-                "fullname": "Tran Thi B",
-                "email": "memberB@example.com",
-                "phone": "0912345678",
-                "gender": "Female",
-                "address": "456 Nguyen Hue, District 1, HCMC",
-                "status": "Active",
-            },
-            {
-                "number": "3",
-                "member_id": "125",
-                "fullname": "Le Van C",
-                "email": "memberC@example.com",
-                "phone": "0923456789",
-                "gender": "Male",
-                "address": "789 Tran Hung Dao, District 5, HCMC",
-                "status": "Active",
-            },
-        ]
-        
+        members = fetch_all_members()
+
         rows = []
-        for member in members:
-            is_active = member["status"] == "Active"
-            
-            # Buttons dựa vào status
-            action_buttons = []
-            action_buttons.append(
-                ft.ElevatedButton(
-                    "Edit", 
-                    bgcolor="#3B82F6", 
-                    color="#FFFFFF", 
-                    height=36,
-                    on_click=lambda e, m=member: self.edit_member(m, e),
-                    style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=20),
-                        padding=ft.Padding(24, 0, 24, 0),
-                    ),
-                )
-            )
-            
-            if is_active:
-                action_buttons.append(
-                    ft.ElevatedButton(
-                        "Lock", 
-                        bgcolor="#EF4444", 
-                        color="#FFFFFF", 
-                        height=36,
-                        style=ft.ButtonStyle(
-                            shape=ft.RoundedRectangleBorder(radius=20),
-                            padding=ft.Padding(24, 0, 24, 0),
-                        ),
-                    )
-                )
-            else:
-                action_buttons.append(
-                    ft.ElevatedButton(
-                        "Unlock", 
-                        bgcolor="#6B7280", 
-                        color="#FFFFFF", 
-                        height=36,
-                        style=ft.ButtonStyle(
-                            shape=ft.RoundedRectangleBorder(radius=20),
-                            padding=ft.Padding(24, 0, 24, 0),
-                        ),
-                    )
-                )
-            
+        for idx, m in enumerate(members, start=1):
+            is_active = m["user_status"] == "ACTIVE"
+
             rows.append(
                 ft.DataRow(cells=[
-                    # Number
-                    ft.DataCell(ft.Text(member["number"], size=12, color="#374151")),
-                    # Member ID
-                    ft.DataCell(ft.Text(member["member_id"], size=12, color="#374151")),
-                    # Full name
-                    ft.DataCell(ft.Text(member["fullname"], size=12, color="#374151")),
-                    # Email
-                    ft.DataCell(ft.Text(member["email"], size=12, color="#374151")),
-                    # Phone
-                    ft.DataCell(ft.Text(member["phone"], size=12, color="#374151")),
-                    # Gender
-                    ft.DataCell(ft.Text(member["gender"], size=12, color="#374151")),
-                    # Address
-                    ft.DataCell(ft.Text(member["address"], size=12, color="#374151", no_wrap=False)),
-                    # Status
+                    ft.DataCell(ft.Text(str(idx), size=12)),
+                    ft.DataCell(ft.Text(m["user_id"], size=12)),
+                    ft.DataCell(ft.Text(m["fullname"], size=12)),
+                    ft.DataCell(ft.Text(m["email"] or "-", size=12)),
+                    ft.DataCell(ft.Text(m["phone"] or "-", size=12)),
+                    ft.DataCell(ft.Text(m["gender"] or "-", size=12)),
+                    ft.DataCell(ft.Text(m["address"] or "-", size=12, no_wrap=False)),
                     ft.DataCell(
                         ft.Container(
                             content=ft.Text(
-                                member["status"], 
-                                size=11, 
-                                color="#15803D" if is_active else "#B91C1C",
-                                weight=ft.FontWeight.W_500
+                                m["user_status"],
+                                size=11,
+                                color="#15803D" if is_active else "#B91C1C"
                             ),
                             bgcolor="#DCFCE7" if is_active else "#FEE2E2",
-                            padding=ft.Padding(10, 4, 10, 4),
+                            padding=ft.padding.symmetric(horizontal=10, vertical=4),
                             border_radius=4,
                         )
                     ),
-                    # Actions
                     ft.DataCell(
-                        ft.Row(action_buttons, spacing=8)
+                        ft.Row([
+                            ft.ElevatedButton(
+                                "Edit",
+                                bgcolor="#3B82F6",
+                                color="#FFFFFF",
+                                height=36,
+                                on_click=lambda e, data=m: self.edit_member(data, e),
+                            )
+                        ])
                     ),
                 ])
             )
-        
-        table = ft.DataTable(
+
+        self.table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("#", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("MEMBER ID", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("FULL NAME", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("EMAIL", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("PHONE", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("GENDER", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("ADDRESS", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("STATUS", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
-                ft.DataColumn(ft.Text("ACTIONS", size=11, color="#9CA3AF", weight=ft.FontWeight.W_600)),
+                ft.DataColumn(ft.Text("#")),
+                ft.DataColumn(ft.Text("MEMBER ID")),
+                ft.DataColumn(ft.Text("FULL NAME")),
+                ft.DataColumn(ft.Text("EMAIL")),
+                ft.DataColumn(ft.Text("PHONE")),
+                ft.DataColumn(ft.Text("GENDER")),
+                ft.DataColumn(ft.Text("ADDRESS")),
+                ft.DataColumn(ft.Text("STATUS")),
+                ft.DataColumn(ft.Text("ACTIONS")),
             ],
             rows=rows,
-            horizontal_lines=ft.BorderSide(1, "#E5E7EB"),
-            heading_row_height=36,
-            data_row_min_height=56,
-            column_spacing=20,
         )
-        
-        return ft.Row(
-            [table],
-            scroll=ft.ScrollMode.AUTO,
-        )
+
+        return ft.Row([self.table], scroll=ft.ScrollMode.AUTO)
     
+
     def save_member(self, e):
-        """Save member"""
-        print(f"Save member: {self.member_id_field.value} - {self.fullname_field.value}")
+        # Kiểm tra dữ liệu bắt buộc
+        if not self.fullname_field.value.strip():
+            self.show_error("Full name is required")
+            return
+        
+        if not self.email_field.value.strip():
+            self.show_error("Email is required")
+            return
+        
+        try:
+            # Chuẩn bị data
+            data = {
+                "fullname": self.fullname_field.value.strip(),
+                "email": self.email_field.value.strip(),
+                "phone": self.phone_field.value.strip(),
+                "gender": self.gender_field.value if self.gender_field.value != "Select" else "",
+                "address": self.address_field.value.strip(),
+                "user_status": "ACTIVE" if self.card_status_field.value == "Active" else "LOCKED",
+            }
+            
+            # Nếu có member_id (đang edit)
+            if self.current_member_id:
+                data["user_id"] = self.current_member_id
+                try:
+                    update_member(data)
+                    self.show_success("Member updated successfully")
+                    self.reset_form(e)
+                    self.refresh_table()
+                except Exception as ex:
+                    print(f"Error updating member: {ex}")
+                    self.show_error(f"Error updating member: {str(ex)}")
+            else:
+                # Thêm mới
+                try:
+                    member_id = insert_member(data)
+                    self.show_success(f"Member added successfully (ID: {member_id})")
+                    self.reset_form(e)
+                    self.refresh_table()
+                except Exception as ex:
+                    print(f"Error inserting member: {ex}")
+                    self.show_error(f"Error adding member: {str(ex)}")
+                    
+        except Exception as ex:
+            print(f"Unexpected error in save_member: {ex}")
+            import traceback
+            traceback.print_exc()
+            self.show_error(f"Unexpected error: {str(ex)}")
+
+
+    def reload_table(self, page):
+        self.table_container.controls.clear()
+
+        members = fetch_all_members()
+        rows = []
+
+        for idx, m in enumerate(members, start=1):
+            is_active = m["status"] == "Active"
+
+            rows.append(
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(str(idx))),
+                    ft.DataCell(ft.Text(m["member_id"])),
+                    ft.DataCell(ft.Text(m["fullname"])),
+                    ft.DataCell(ft.Text(m["email"])),
+                    ft.DataCell(ft.Text(m["phone"])),
+                    ft.DataCell(ft.Text(m["gender"])),
+                    ft.DataCell(ft.Text(m["address"], no_wrap=False)),
+                    ft.DataCell(
+                        ft.Container(
+                            content=ft.Text(
+                                m["status"],
+                                color="#15803D" if is_active else "#B91C1C",
+                                size=11
+                            ),
+                            bgcolor="#DCFCE7" if is_active else "#FEE2E2",
+                            padding=ft.Padding(8, 4, 8, 4),
+                            border_radius=4,
+                        )
+                    ),
+                    ft.DataCell(
+                        ft.Row([
+                            ft.ElevatedButton(
+                                "Edit",
+                                on_click=lambda e, mem=m: self.edit_member(mem, e)
+                            ),
+                            ft.ElevatedButton(
+                                "Lock" if is_active else "Unlock",
+                                bgcolor="#EF4444" if is_active else "#6B7280",
+                                on_click=lambda e, mid=m["member_id"], s=is_active:
+                                    self.toggle_status(mid, s, e)
+                            )
+                        ])
+                    )
+                ])
+            )
+
+        self.table_container.controls.append(
+            ft.DataTable(columns=self.columns, rows=rows)
+        )
+        page.update()
+    def edit_member(self, m, e):
+        self.current_member_id = m["user_id"]
+
+        self.member_id_field.value = m["user_id"]
+        self.fullname_field.value = m["fullname"]
+        self.email_field.value = m["email"] or ""
+        self.phone_field.value = m["phone"] or ""
+        self.gender_field.value = m["gender"] or "Select"
+        self.address_field.value = m["address"] or ""
+        self.card_status_field.value = "Active" if m["user_status"] == "ACTIVE" else "Temporarily Locked"
+
+        e.page.update()
+    def refresh_table(self):
+        """Đơn giản chỉ update page để reload toàn bộ"""
+        if self.page_ref:
+            self.page_ref.update()

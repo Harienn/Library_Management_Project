@@ -6,7 +6,7 @@ class Sidebar:
         self.current_route = current_route
         self.navigate = navigate_callback
         self.user_role = user_role
-        self.on_logout = None  # SẼ ĐƯỢC GÁN TỪ ADMIN_APP
+        self.on_logout = None  # ✅ SẼ ĐƯỢC GÁN TỪ ADMIN_APP
     
     def build(self):
         menu_sections = [
@@ -41,7 +41,7 @@ class Sidebar:
             )
             
             for label, route, icon, requires_admin in items:
-                # BỎ QUA menu item nếu requires_admin=True và user không phải Admin
+                # ✅ BỎ QUA menu item nếu requires_admin=True và user không phải Admin
                 if requires_admin and self.user_role != "Admin":
                     continue  # ← SKIP item này, không render
                 
@@ -80,7 +80,7 @@ class Sidebar:
                             bgcolor="#DC2626",
                             border_radius=4,
                             margin=ft.Margin(0, 8, 0, 0),
-                            on_click=lambda _: self.on_logout() if self.on_logout else None,
+                            on_click=lambda _: self.on_logout() if hasattr(self, 'on_logout') and self.on_logout else print("Logout"),
                             ink=True,
                         ),
                     ], spacing=2),
