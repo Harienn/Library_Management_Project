@@ -138,6 +138,20 @@ class LibraryApp:
         """Callback sau khi đăng ký thành công"""
         self.current_user = user
         print(f"✅ Registration successful for: {user.get('fullname')}")
+<<<<<<< HEAD
+=======
+        
+        # ✅ Check fines trong background (popup overlay)
+        if user and user.get('user_id'):
+            import threading
+            threading.Thread(
+                target=lambda: self.check_and_show_fines(user['user_id']),
+                daemon=True
+            ).start()
+        
+        # ✅ NAVIGATE VỀ HOME
+        self.navigate("/")
+>>>>>>> version-2
 
     # ================= LOGOUT =================
     

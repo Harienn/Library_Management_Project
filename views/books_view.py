@@ -439,7 +439,7 @@ class BooksView:
         book_id = book.get("book_id")
         member_id = self.current_user.get("user_id")
         
-        success, message = borrow_book(member_id, book_id)
+        success, message, transaction_id = borrow_book(member_id, book_id)
         
         # Show snackbar
         self.page.snack_bar = ft.SnackBar(
