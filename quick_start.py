@@ -1,258 +1,183 @@
+"""
+📚 QUICK START V2 - Premium Book Covers
+Phiên bản nâng cao với ảnh đẹp hơn
+"""
+
+import sys
 import mysql.connector
 from mysql.connector import Error
-import sys
 
-# ✅ Đã cấu hình sẵn theo db.py của bạn
+# Database configuration
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'taolao',
-    'database': 'LibraryDB',
-    'auth_plugin': 'mysql_native_password'
+    'password': 'taolao',  # Thay bằng password của bạn
+    'database': 'LibraryDB'
 }
 
-# 🎨 URLs ảnh đẹp từ nhiều nguồn
-BOOK_IMAGES = {
-    # Sách Việt Nam
-    'Tôi thấy hoa vàng trên cỏ xanh': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1626766673i/58455775.jpg',
-    'Cho tôi xin một vé đi tuổi thơ': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1626766649i/58455774.jpg',
-    'Chí Phèo': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348690306i/16088141.jpg',
-    'Tắt đèn': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1442677487i/26625036.jpg',
-    'Dế Mèn phiêu lưu ký': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1415937853i/23648586.jpg',
-    'Truyện Kiều': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1442691265i/26625159.jpg',
-    'Cánh đồng bất tận': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1415937819i/23648584.jpg',
+# 🎨 Bộ sưu tập ảnh bìa sách PREMIUM - cực kỳ đẹp!
+PREMIUM_BOOK_COVERS = {
+    # Văn học Việt Nam - Phong cảnh thiên nhiên đẹp
+    'Tôi thấy hoa vàng trên cỏ xanh': 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=500&q=80',  # Mountain meadow
+    'Cho tôi xin một vé đi tuổi thơ': 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=500&q=80',  # Mountain landscape
+    'Chí Phèo': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&q=80',  # Portrait style
+    'Dế Mèn phiêu lưu ký': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=500&q=80',  # Forest path
+    'Tắt đèn': 'https://images.unsplash.com/photo-1475776408506-9a5371e7a068?w=500&q=80',  # Sunset field
+    'Truyện Kiều': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=500&q=80',  # Ocean sunset
+    'Góc sân và khoảng trời': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&q=80',  # Sky clouds
+    'Cánh đồng bất tận': 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=500&q=80',  # Wheat field
     
-    # Sách nước ngoài
-    'Rừng Na Uy': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1448742854i/11297.jpg',
-    'Nhà giả kim': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1654371463i/18144590.jpg',
-    '1Q84': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1483103331i/10357575.jpg',
-    'Harry Potter và Hòn đá phù thủy': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1598823299i/42844155.jpg',
-    'Những người khốn khổ': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1411852091i/24280.jpg',
+    # Văn học nước ngoài - Phong cách nghệ thuật
+    'Rừng Na Uy': 'https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=500&q=80',  # Forest atmosphere
+    '1Q84': 'https://images.unsplash.com/photo-1514539079130-25950c84af65?w=500&q=80',  # Moon night
+    'Nhà giả kim': 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=500&q=80',  # Desert golden
+    'Lược sử thời gian': 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=500&q=80',  # Galaxy stars
+    'Đắc nhân tâm': 'https://images.unsplash.com/photo-1521791055366-0d553872125f?w=500&q=80',  # People networking
+    'Harry Potter và Hòn đá phù thủy': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=500&q=80',  # Magic book
+    'Những người khốn khổ': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=500&q=80',  # Old book
+    'Đi tìm lẽ sống': 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=500&q=80',  # Light path
     
-    # Sách kỹ năng & khoa học
-    'Lược sử thời gian': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1333578746i/3869.jpg',
-    'Đắc nhân tâm': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1442726934i/4865.jpg',
-    'Tôi tài giỏi, bạn cũng thế': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348685517i/12657835.jpg',
-    'Dạy con làm giàu tập 1': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1388211242i/69571.jpg',
-    'Đi tìm lẽ sống': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1535419394i/4069.jpg',
+    # Sách kỹ năng - Hiện đại, chuyên nghiệp
+    'Tôi tài giỏi, bạn cũng thế': 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&q=80',  # Team success
+    'Dạy con làm giàu tập 1': 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=500&q=80',  # Money growth
     
-    # Sách IT
-    'Lập trình Java cơ bản': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1348442512i/15824.jpg',
-    'Clean Code': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1436202607i/3735293.jpg',
-    
-    # Thêm sách khác
-    'Góc sân và khoảng trời': 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1442691179i/26625146.jpg',
+    # Sách lập trình - Tech style
+    'Lập trình Java cơ bản': 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=500&q=80',  # Laptop code
+    'Clean Code': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=500&q=80',  # Code screen
+}
+
+# 🌈 Backup covers - Nếu không tìm thấy tên sách chính xác
+CATEGORY_COVERS = {
+    'vietnamese': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&q=80',
+    'fiction': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=500&q=80',
+    'programming': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=500&q=80',
+    'selfhelp': 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=500&q=80',
+    'default': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=500&q=80'
 }
 
 
-def generate_placeholder(title, book_id):
-    """Tạo placeholder gradient đẹp"""
-    colors = [
-        ('667eea', '764ba2'),  # Purple
-        ('f093fb', 'f5576c'),  # Pink
-        ('4facfe', '00f2fe'),  # Blue
-        ('43e97b', '38f9d7'),  # Green
-        ('fa709a', 'fee140'),  # Orange
-        ('30cfd0', '330867'),  # Teal
-    ]
-    
-    color1, color2 = colors[book_id % len(colors)]
-    
-    # Lấy chữ cái đầu
-    words = title.split()
-    if len(words) >= 2:
-        text = (words[0][0] + words[1][0]).upper()
-    else:
-        text = title[:2].upper()
-    
-    import urllib.parse
-    return f"https://ui-avatars.com/api/?name={urllib.parse.quote(text)}&size=400&background={color1}&color=fff&font-size=0.4&bold=true"
+def print_fancy_header():
+    """Header cực đẹp"""
+    print("\n╔═══════════════════════════════════════════════════════════╗")
+    print("║              📚 QUICK START - BOOK IMAGES                ║")
+    print("║                  Fast & Simple Setup                      ║")
+    print("╚═══════════════════════════════════════════════════════════╝")
+    print("=" * 60)
+    print("🚀 QUICK START - ADDING BOOK IMAGES")
+    print("=" * 60)
 
 
-def quick_update():
-    """Quick update - Fast & Simple"""
+def connect_db():
+    """Kết nối database"""
     try:
-        print("\n" + "="*60)
-        print("🚀 QUICK START - ADDING BOOK IMAGES")
-        print("="*60 + "\n")
-        
-        # Kết nối
         print("🔗 Connecting to database...")
         connection = mysql.connector.connect(**DB_CONFIG)
-        cursor = connection.cursor(dictionary=True)
-        print("✅ Connected!\n")
-        
-        # Lấy sách
-        cursor.execute("SELECT book_id, title FROM BOOKS")
-        books = cursor.fetchall()
-        
-        print(f"📚 Found {len(books)} books\n")
-        
-        updated = 0
-        for book in books:
-            book_id = book['book_id']
-            title = book['title']
-            
-            # Tìm ảnh
-            if title in BOOK_IMAGES:
-                image_url = BOOK_IMAGES[title]
-                source = "✅ Real cover"
-            else:
-                image_url = generate_placeholder(title, book_id)
-                source = "🎨 Beautiful placeholder"
-            
-            # Update
-            cursor.execute(
-                "UPDATE BOOKS SET image_url = %s WHERE book_id = %s",
-                (image_url, book_id)
-            )
-            
-            print(f"[{book_id:2d}] {title[:45]:45s} | {source}")
-            updated += 1
-        
-        connection.commit()
-        
-        print("\n" + "="*60)
-        print(f"✅ SUCCESS! Updated {updated} books!")
-        print("="*60)
-        
-        # Stats
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN image_url LIKE '%goodreads%' OR image_url LIKE '%amazon%' THEN 1 ELSE 0 END) as real,
-                SUM(CASE WHEN image_url LIKE '%ui-avatars%' THEN 1 ELSE 0 END) as placeholder
-            FROM BOOKS
-        """)
-        stats = cursor.fetchone()
-        
-        print(f"\n📊 Statistics:")
-        print(f"   • Real book covers: {stats['real']}")
-        print(f"   • Beautiful placeholders: {stats['placeholder']}")
-        print(f"   • Total: {stats['total']}")
-        
-        print("\n💡 Next steps:")
-        print("   1. Restart your Flet app: python main.py")
-        print("   2. Go to Books page")
-        print("   3. Enjoy beautiful book covers! 🎉")
-        
-        cursor.close()
-        connection.close()
-        
-        return True
-        
+        if connection.is_connected():
+            print("✅ Connected!")
+            return connection
     except Error as e:
-        print(f"\n❌ Database Error: {e}")
+        print(f"❌ Database Error: {e}")
         print("\n💡 Troubleshooting:")
         print("   1. Make sure MySQL is running")
         print("   2. Check database credentials in DB_CONFIG")
         print("   3. Verify LibraryDB exists")
-        return False
+        return None
+
+
+def get_books(cursor):
+    """Lấy danh sách sách"""
+    cursor.execute("SELECT book_id, title, image_url FROM Books ORDER BY title")
+    return cursor.fetchall()
+
+
+def get_smart_cover(title):
+    """Tìm ảnh thông minh - có backup nếu không tìm thấy"""
+    # Thử tìm ảnh chính xác
+    if title in PREMIUM_BOOK_COVERS:
+        return PREMIUM_BOOK_COVERS[title]
     
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    # Thử tìm theo category
+    title_lower = title.lower()
+    if any(word in title_lower for word in ['java', 'code', 'lập trình', 'programming']):
+        return CATEGORY_COVERS['programming']
+    elif any(word in title_lower for word in ['giàu', 'thành công', 'kỹ năng']):
+        return CATEGORY_COVERS['selfhelp']
+    elif any(word in title_lower for word in ['việt nam', 'truyện', 'văn học']):
+        return CATEGORY_COVERS['vietnamese']
+    
+    return CATEGORY_COVERS['default']
 
 
-def check_status():
-    """Kiểm tra trạng thái nhanh"""
+def update_book_image(cursor, book_id, image_url):
+    """Cập nhật ảnh cho sách"""
+    query = "UPDATE Books SET image_url = %s WHERE book_id = %s"
+    cursor.execute(query, (image_url, book_id))
+
+
+def update_images(connection):
+    """Cập nhật ảnh cho tất cả sách"""
+    cursor = connection.cursor()
+    
+    books = get_books(cursor)
+    print(f"📚 Found {len(books)} books")
+    
+    updated_count = 0
+    
+    for book_id, title, current_image in books:
+        new_image = get_smart_cover(title)
+        
+        update_book_image(cursor, book_id, new_image)
+        updated_count += 1
+        
+        # Kiểm tra xem có phải ảnh premium không
+        is_premium = title in PREMIUM_BOOK_COVERS
+        status = "✅ Premium cover" if is_premium else "✅ Smart cover"
+        
+        print(f"[{book_id:2d}] {title:45s} | {status}")
+    
+    connection.commit()
+    cursor.close()
+    
+    print("=" * 60)
+    print(f"✅ SUCCESS! Updated {updated_count} books!")
+    print("=" * 60)
+
+
+def show_preview():
+    """Hiển thị preview các ảnh"""
+    print("\n🎨 PREVIEW - Premium Book Covers:")
+    print("-" * 60)
+    for title, url in list(PREMIUM_BOOK_COVERS.items())[:5]:
+        print(f"  📖 {title}")
+        print(f"     🔗 {url[:50]}...")
+    print(f"  ... and {len(PREMIUM_BOOK_COVERS) - 5} more!")
+    print("-" * 60 + "\n")
+
+
+def main():
+    """Main function"""
+    if len(sys.argv) > 1 and sys.argv[1] == 'preview':
+        show_preview()
+        return
+    
+    print_fancy_header()
+    
+    connection = connect_db()
+    if not connection:
+        return
+    
     try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        cursor = connection.cursor(dictionary=True)
-        
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN image_url IS NOT NULL AND image_url != '' THEN 1 ELSE 0 END) as with_images,
-                SUM(CASE WHEN image_url IS NULL OR image_url = '' THEN 1 ELSE 0 END) as without_images
-            FROM BOOKS
-        """)
-        
-        stats = cursor.fetchone()
-        
-        print("\n" + "="*60)
-        print("📊 CURRENT STATUS")
-        print("="*60)
-        print(f"\nTotal books: {stats['total']}")
-        print(f"✅ Books with images: {stats['with_images']}")
-        print(f"❌ Books without images: {stats['without_images']}")
-        
-        if stats['with_images'] == stats['total']:
-            print("\n🎉 All books have images! Perfect!")
-        elif stats['with_images'] > 0:
-            percentage = (stats['with_images'] / stats['total']) * 100
-            print(f"\n📈 Coverage: {percentage:.1f}%")
-        else:
-            print("\n⚠️  No images yet. Run 'python quick_start.py update' to add them!")
-        
-        print("="*60 + "\n")
-        
-        cursor.close()
-        connection.close()
+        update_images(connection)
+        print("\n🎉 Done! Refresh your Flet app to see the changes!")
+        print("💡 Tip: All images are high quality from Unsplash\n")
         
     except Error as e:
-        print(f"\n❌ Cannot connect to database: {e}")
-        print("Make sure MySQL is running and credentials are correct.\n")
+        print(f"❌ Error: {e}")
+    
+    finally:
+        if connection.is_connected():
+            connection.close()
 
 
 if __name__ == "__main__":
-    print("""
-╔═══════════════════════════════════════════════════════════╗
-║              📚 QUICK START - BOOK IMAGES                ║
-║                  Fast & Simple Setup                      ║
-╚═══════════════════════════════════════════════════════════╝
-    """)
-    
-    if len(sys.argv) > 1:
-        command = sys.argv[1].lower()
-        
-        if command == 'update':
-            success = quick_update()
-            sys.exit(0 if success else 1)
-        
-        elif command == 'status':
-            check_status()
-            sys.exit(0)
-        
-        elif command == 'help':
-            print("""
-📖 USAGE:
-    python quick_start.py update   - Add images to all books
-    python quick_start.py status   - Check current status
-    python quick_start.py help     - Show this help
-
-✨ FEATURES:
-    • Real book covers from Goodreads
-    • Beautiful gradient placeholders for missing books
-    • Fast execution (< 10 seconds)
-    • Already configured with your database credentials
-    • Safe - only updates books without images
-
-💡 TIP: Just run 'python quick_start.py update' to get started!
-            """)
-            sys.exit(0)
-        
-        else:
-            print(f"❌ Unknown command: {command}")
-            print("Usage: python quick_start.py [update|status|help]")
-            sys.exit(1)
-    
-    else:
-        # Interactive mode
-        print("\nWhat do you want to do?")
-        print("  1. Add images to books (recommended)")
-        print("  2. Check current status")
-        print("  q. Quit")
-        
-        choice = input("\nYour choice (1/2/q): ").strip()
-        
-        if choice == '1':
-            quick_update()
-        elif choice == '2':
-            check_status()
-        elif choice.lower() == 'q':
-            print("\n👋 Goodbye!")
-        else:
-            print("\n❌ Invalid choice")
+    main()
