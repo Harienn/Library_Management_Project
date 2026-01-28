@@ -3,34 +3,76 @@ import flet as ft
 from components.header import Header
 from components.navbar import NavBar
 from components.book_card import BookCard
-
+from database.db import fetch_all
 
 class HomeView:
-    def __init__(self, page, current_user, navigate):
+    def __init__(self, page, current_user, navigate, on_logout=None):
         self.page = page
         self.current_user = current_user
         self.navigate = navigate
-    
+        self.on_logout = on_logout
+
     def build(self):
-        header = Header(self.page, self.current_user, self.navigate)
+        header = Header(self.page, self.current_user, self.navigate, self.on_logout)
         navbar = NavBar(self.page, self.current_user, self.navigate, "/")
-        
-        # === HERO SECTION ===
+
+        # HERO SECTION - CHỈ THAY ĐỔI PHẦN NÀY: Thêm ảnh vào container xám
         hero_left = ft.Container(
-            bgcolor=ft.Colors.GREY_300,
+            content=ft.Stack([
+                # Ảnh thư viện
+                ft.Container(
+                    content=ft.Image(
+                        src="https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1200&q=80",
+                        fit="cover",
+                    ),
+                    width=9999,
+                    height=340,
+                ),
+                # Overlay tối để text dễ đọc
+                ft.Container(
+                    width=9999,
+                    height=340,
+                    gradient=ft.LinearGradient(
+                        begin=ft.alignment.Alignment(0, -1),
+                        end=ft.alignment.Alignment(0, 1),
+                        colors=["#00000040", "#00000070"],
+                    ),
+                ),
+                # Text
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text(
+                            "Welcome to Our Library",
+                            size=32,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.WHITE,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Container(height=8),
+                        ft.Text(
+                            "Discover thousands of books and resources",
+                            size=16,
+                            color=ft.Colors.WHITE,
+                            text_align=ft.TextAlign.CENTER,
+                            opacity=0.95,
+                        ),
+                    ], 
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    width=9999,
+                    height=340,
+                ),
+            ]),
             border_radius=18,
             expand=2,
             height=340,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
         )
-        
+
+        # GIỮ NGUYÊN PHẦN NÀY - KHÔNG THAY ĐỔI
         hero_right = ft.Container(
             content=ft.Column([
-                ft.Text(
-                    "Featured statistics",
-                    size=22,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.WHITE,
-                ),
+                ft.Text("Featured statistics", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                 ft.Container(height=24),
                 self.create_stat_item("📚", "16,702+", "publications"),
                 ft.Container(height=28),
@@ -49,43 +91,45 @@ class HomeView:
             expand=1,
             height=340,
         )
-        
+
         hero_section = ft.Container(
             content=ft.Row([hero_left, hero_right], spacing=24),
             padding=ft.Padding(left=40, right=40, top=28, bottom=0),
         )
-        
-        # === TOP BORROWING BOOKS ===
+
+        # TOP BORROWING BOOKS
         top_books = self.get_top_borrowing_books()
         top_books_section = ft.Column([
             ft.Text("Top Borrowing Books", size=28, weight=ft.FontWeight.BOLD),
             ft.Container(height=20),
             ft.Row([
                 BookCard(
-                    book,
-                    on_book_click=lambda e, b=book: self.navigate("/book_detail"),
-                    on_borrow_click=lambda e, b=book: self.handle_borrow_click()
-                ).build() 
+                    book_data=book,
+                    current_user=self.current_user,
+                    on_book_click=lambda e, b=book: self.handle_book_click(b),
+                    on_borrow_click=lambda e, b=book: self.handle_borrow_click(b),
+                ).build()
                 for book in top_books
             ], spacing=22, scroll="auto"),
-        ], spacing=0)
-        
-        # === YOU MUST READ IT NOW ===
+        ])
+
+        # MUST READ
         must_read_books = self.get_must_read_books()
         must_read_section = ft.Column([
             ft.Text("You must read it now", size=28, weight=ft.FontWeight.BOLD),
             ft.Container(height=20),
             ft.Row([
                 BookCard(
-                    book,
-                    on_book_click=lambda e, b=book: self.navigate("/book_detail"),
-                    on_borrow_click=lambda e, b=book: self.handle_borrow_click()
-                ).build() 
+                    book_data=book,
+                    current_user=self.current_user,
+                    on_book_click=lambda e, b=book: self.handle_book_click(b),
+                    on_borrow_click=lambda e, b=book: self.handle_borrow_click(b),
+                ).build()
                 for book in must_read_books
             ], spacing=22, scroll="auto"),
-        ], spacing=0)
-        
-        # === SCROLLABLE CONTENT (CHỈ PHẦN NÀY SCROLL) ===
+        ])
+
+        # SCROLLABLE CONTENT
         scrollable_content = ft.Column([
             hero_section,
             ft.Container(height=28),
@@ -94,30 +138,27 @@ class HomeView:
                     top_books_section,
                     ft.Container(height=28),
                     must_read_section,
-                ], spacing=0),
+                ]),
                 padding=ft.Padding(left=40, right=40, top=0, bottom=34),
             ),
-        ], spacing=0, scroll="auto", expand=True)  # CHỈ PHẦN NÀY SCROLL
-        
-        # === MAIN LAYOUT (HEADER + NAVBAR CỐ ĐỊNH) ===
-        content = ft.Column([
-            header.build(),      # CỐ ĐỊNH
-            navbar.build(),      # CỐ ĐỊNH
-            scrollable_content,  # SCROLL
-        ], spacing=0, expand=True)
-        
+        ], scroll="auto", expand=True)
+
+        # MAIN VIEW
         return ft.View(
             route="/",
             controls=[
                 ft.Container(
-                    content=content,
-                    padding=0,
+                    content=ft.Column([
+                        header.build(),
+                        navbar.build(),
+                        scrollable_content,
+                    ], expand=True),
                     bgcolor=ft.Colors.GREY_50,
                     expand=True,
                 )
             ],
         )
-    
+
     def create_stat_item(self, icon, value, label):
         return ft.Row([
             ft.Container(
@@ -133,67 +174,139 @@ class HomeView:
                 ft.Text(label, size=16, color=ft.Colors.with_opacity(0.9, ft.Colors.WHITE)),
             ], spacing=0, tight=True),
         ], spacing=16, vertical_alignment="center")
-    
-    def handle_borrow_click(self):
-        if self.current_user:
-            pass
-        else:
+
+    def handle_book_click(self, book):
+        """Handle click on book card to view detail"""
+        print(f"📖 Book clicked: {book.get('title')}")
+        print(f"📖 Book ID: {book.get('book_id')}")
+        
+        if self.page.data is None:
+            self.page.data = {}
+        elif not isinstance(self.page.data, dict):
+            self.page.data = {}
+            
+        self.page.data['selected_book'] = book
+        self.navigate("/book_detail")
+
+    def handle_borrow_click(self, book):
+        """Handle borrow"""
+        if not self.current_user:
             self.navigate("/login")
-    
+            return
+        
+        from services.borrow_service import borrow_book
+        
+        book_id = book.get("book_id")
+        member_id = self.current_user.get("user_id")
+        
+        success, message = borrow_book(member_id, book_id)
+        
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(message, color=ft.Colors.WHITE),
+            bgcolor=ft.Colors.GREEN_700 if success else ft.Colors.RED_700,
+        )
+        self.page.snack_bar.open = True
+        self.page.update()
+        
+        if success:
+            import time
+            time.sleep(1)
+            self.navigate("/my_borrowing")
+
     def get_top_borrowing_books(self):
-        return [
-            {
-                "title": "Financial Feminist",
-                "author": "Tori Dunlap",
-                "cover_url": "https://via.placeholder.com/200x280/FF6B6B/FFFFFF?text=Financial+Feminist"
-            },
-            {
-                "title": "No More Police",
-                "author": "Andrea Ritchie",
-                "cover_url": "https://via.placeholder.com/200x280/4ECDC4/FFFFFF?text=No+More+Police"
-            },
-            {
-                "title": "I'm Glad My Mom Died",
-                "author": "Jennette McCurdy",
-                "cover_url": "https://via.placeholder.com/200x280/45B7D1/FFFFFF?text=My+Mom+Died"
-            },
-            {
-                "title": "Nona the Ninth",
-                "author": "Tamsyn Muir",
-                "cover_url": "https://via.placeholder.com/200x280/FFA07A/FFFFFF?text=Nona+Ninth"
-            },
-            {
-                "title": "Chain of Gold",
-                "author": "Cassandra Clare",
-                "cover_url": "https://via.placeholder.com/200x280/98D8C8/FFFFFF?text=Chain+Gold"
-            },
-        ]
-    
+        try:
+            query = """
+                SELECT 
+                    b.book_id, b.title,
+                    a.author_name as author,
+                    b.image_url as cover_url,
+                    b.available_copies,
+                    COUNT(bt.transaction_id) as borrow_count
+                FROM BOOKS b
+                LEFT JOIN AUTHORS a ON b.author_id = a.author_id
+                LEFT JOIN BORROWING_TRANSACTION_DETAILS btd ON b.book_id = btd.book_id
+                LEFT JOIN BORROWING_TRANSACTION bt ON btd.transaction_id = bt.transaction_id
+                WHERE b.available_copies > 0
+                GROUP BY b.book_id, b.title, a.author_name, b.image_url, b.available_copies
+                ORDER BY borrow_count DESC
+                LIMIT 5
+            """
+            books = fetch_all(query)
+            
+            result = []
+            for book in books:
+                result.append({
+                    'book_id': book['book_id'],
+                    'title': book['title'],
+                    'author': book['author'] or 'Unknown Author',
+                    'cover_url': book['cover_url'] or self.generate_placeholder(book['title']),
+                    'available_copies': book.get('available_copies', 0)
+                })
+            
+            return result if result else self.get_fallback_books()
+        except Exception as e:
+            print(f"Error loading top books: {e}")
+            return self.get_fallback_books()
+
     def get_must_read_books(self):
+        try:
+            query = """
+                SELECT 
+                    b.book_id, b.title,
+                    a.author_name as author,
+                    b.image_url as cover_url,
+                    b.available_copies,
+                    b.publish_date
+                FROM BOOKS b
+                LEFT JOIN AUTHORS a ON b.author_id = a.author_id
+                WHERE b.available_copies > 0
+                ORDER BY b.publish_date DESC, b.book_id DESC
+                LIMIT 5
+            """
+            books = fetch_all(query)
+            
+            result = []
+            for book in books:
+                result.append({
+                    'book_id': book['book_id'],
+                    'title': book['title'],
+                    'author': book['author'] or 'Unknown Author',
+                    'cover_url': book['cover_url'] or self.generate_placeholder(book['title']),
+                    'available_copies': book.get('available_copies', 0)
+                })
+            
+            return result if result else self.get_fallback_books()
+        except Exception as e:
+            print(f"Error loading must read books: {e}")
+            return self.get_fallback_books()
+
+    def generate_placeholder(self, title):
+        import hashlib
+        color = hashlib.md5(title.encode()).hexdigest()[:6]
+        safe_title = title.replace(' ', '+')[:20]
+        return f"https://via.placeholder.com/200x280/{color}/FFFFFF?text={safe_title}"
+
+    def get_fallback_books(self):
         return [
             {
-                "title": "Monthly Top Book 1",
-                "author": "Author name",
-                "cover_url": "https://via.placeholder.com/200x280/F7DC6F/FFFFFF?text=Monthly+1"
+                "book_id": 1,
+                "title": "Tôi thấy hoa vàng trên cỏ xanh",
+                "author": "Nguyễn Nhật Ánh",
+                "cover_url": "https://via.placeholder.com/200x280/FF6B6B/FFFFFF?text=Hoa+Vang",
+                "available_copies": 5
             },
             {
-                "title": "Monthly Top Book 2",
-                "author": "Author name",
-                "cover_url": "https://via.placeholder.com/200x280/BB8FCE/FFFFFF?text=Monthly+2"
+                "book_id": 2,
+                "title": "Cho tôi xin một vé đi tuổi thơ",
+                "author": "Nguyễn Nhật Ánh",
+                "cover_url": "https://via.placeholder.com/200x280/4ECDC4/FFFFFF?text=Ve+Di+Tuoi+Tho",
+                "available_copies": 3
             },
             {
-                "title": "Monthly Top Book 3",
-                "author": "Author name",
-                "cover_url": "https://via.placeholder.com/200x280/85C1E2/FFFFFF?text=Monthly+3"
-            },
-            {
-                "title": "Monthly Top Book 4",
-                "author": "Author name",
-                "cover_url": "https://via.placeholder.com/200x280/F8B195/FFFFFF?text=Monthly+4"
-            },
-            {
-                "title": "Monthly Top Book 5",
-                "author": "Author name",
-                "cover_url": "https://via.placeholder.com/200x280/C06C84/FFFFFF?text=Monthly+5"
+                "book_id": 3,
+                "title": "Chí Phèo",
+                "author": "Nam Cao",
+                "cover_url": "https://via.placeholder.com/200x280/45B7D1/FFFFFF?text=Chi+Pheo",
+                "available_copies": 4
             },
         ]

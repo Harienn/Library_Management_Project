@@ -1,34 +1,68 @@
-# views/admin/admin_app.py
+# admin_app.py
 import flet as ft
-from components.sidebar import Sidebar
-from components.topbar import Topbar
-from pages.dashboard import DashboardPage
-from pages.manage_books import ManageBooksPage
-from pages.manage_members import ManageMembersPage
-from pages.manage_librarians import ManageLibrariansPage
-from pages.borrow_return import BorrowReturnPage
-from pages.view_fines import ViewFinesPage
-from pages.reports import ReportsPage
+from views.admin.components.sidebar import Sidebar
+from views.admin.components.topbar import Topbar
+from views.admin.pages.dashboard import DashboardPage
+from views.admin.pages.manage_books import ManageBooksPage
+from views.admin.pages.manage_members import ManageMembersPage
+from views.admin.pages.manage_librarians import ManageLibrariansPage
+from views.admin.pages.borrow_return import BorrowReturnPage
+from views.admin.pages.view_fines import ViewFinesPage
+from views.admin.pages.reports import ReportsPage
+
+# ✅ THÊM IMPORT
+from authz import can
+
 
 class AdminApp:
     def __init__(self, page, user_role="Librarian"):
         self.page = page
         self.page.title = "LibrarySystem - Admin"
-        self.page.padding = 0
-        self.page.spacing = 0
-        self.page.bgcolor = "#F5F7FB"
         
         self.user_role = user_role
         self.current_user = {
             "email": f"{user_role.lower()}@rary.local",
-            "role": user_role,
+            "role_name": user_role.upper(),
             "name": user_role
         }
         
         self.current_route = "/admin"
+        self.on_logout = None  # ✅ SẼ ĐƯỢC GÁN TỪ MAIN.PY
+    
+    def handle_logout(self, e=None):
+        """✅ Xử lý logout cho admin/librarian"""
+        print(f"🚪 Logging out {self.user_role}...")
+        
+        # Gọi callback logout từ main app TRƯỚC (quan trọng!)
+        if self.on_logout:
+            self.on_logout()
+        
+        # Clear admin user
+        self.current_user = None
+        
+        # Approach 1: Gọi route_change từ page
+        # Clear views và navigate về home
+        self.page.views.clear()
+        self.page.route = "/"
+        
+        # Force trigger route change event
+        if hasattr(self.page, 'on_route_change') and self.page.on_route_change:
+            # Manually trigger route change
+            class FakeEvent:
+                pass
+            self.page.on_route_change(FakeEvent())
+        else:
+            # Fallback: just update
+            self.page.update()
         
     def navigate(self, route):
-        # Kiểm tra nếu yêu cầu admin
+        # ✅ CHECK QUYỀN TRƯỚC KHI NAVIGATE
+        if route == "/admin/librarians":
+            if not can(self.current_user, "manage_librarians"):
+                self.show_admin_required_dialog()
+                return
+        
+        # Nếu yêu cầu admin (từ sidebar)
         if route == "__require_admin__":
             self.show_admin_required_dialog()
             return
@@ -47,7 +81,7 @@ class AdminApp:
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Row([
-                ft.Icon(ft.icons.LOCK, color=ft.Colors.ORANGE_600, size=24),
+                ft.Icon(ft.icons.LOCK_OUTLINED, color=ft.Colors.ORANGE_600, size=24),
                 ft.Text("Admin Access Required", size=18, weight=ft.FontWeight.BOLD),
             ], spacing=12),
             content=ft.Column([
@@ -57,31 +91,20 @@ class AdminApp:
                     color="#6B7280",
                 ),
                 ft.Text(
-                    "Please login with an Admin account to access Manage Librarians.",
+                    f"You are currently logged in as: {self.user_role}",
                     size=13,
                     color="#9CA3AF",
                 ),
                 ft.Container(height=10),
-                ft.TextField(
-                    label="Admin email",
-                    hint_text="admin@rary.local",
-                    border_color=ft.Colors.GREY_400,
-                ),
-                ft.TextField(
-                    label="Admin password",
-                    password=True,
-                    can_reveal_password=True,
-                    border_color=ft.Colors.GREY_400,
+                ft.Text(
+                    "Please contact your administrator to upgrade your account.",
+                    size=12,
+                    color="#EF4444",
+                    italic=True,
                 ),
             ], tight=True, spacing=12),
             actions=[
-                ft.TextButton("Cancel", on_click=close_dialog),
-                ft.ElevatedButton(
-                    "Login as Admin",
-                    bgcolor=ft.Colors.CYAN_400,
-                    color=ft.Colors.WHITE,
-                    on_click=lambda e: print("Login admin clicked"),
-                ),
+                ft.TextButton("Close", on_click=close_dialog),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -91,7 +114,11 @@ class AdminApp:
         self.page.update()
     
     def build_page(self):
-        sidebar = Sidebar(self.current_route, self.navigate, self.user_role).build()
+        # ✅ TRUYỀN LOGOUT CALLBACK CHO SIDEBAR
+        sidebar_obj = Sidebar(self.current_route, self.navigate, self.user_role)
+        sidebar_obj.on_logout = self.handle_logout  # ✅ Gán logout handler
+        sidebar_widget = sidebar_obj.build()
+        
         topbar = Topbar(self.get_page_title(), self.current_user).build()
         content = self.get_page_content()
         
@@ -99,7 +126,7 @@ class AdminApp:
             route=self.current_route,
             controls=[
                 ft.Row([
-                    sidebar,
+                    sidebar_widget,
                     ft.Container(
                         content=ft.Column([
                             topbar,
@@ -114,6 +141,7 @@ class AdminApp:
                 ], spacing=0, expand=True)
             ],
             padding=0,
+            spacing=0,
             bgcolor="#F5F7FB",
         )
     
@@ -125,6 +153,9 @@ class AdminApp:
         elif self.current_route == "/admin/members":
             return ManageMembersPage().build()
         elif self.current_route == "/admin/librarians":
+            # ✅ DOUBLE CHECK (phòng trường hợp bypass)
+            if not can(self.current_user, "manage_librarians"):
+                return ft.Text("Access Denied", size=20, color=ft.Colors.RED_600)
             return ManageLibrariansPage().build()
         elif self.current_route == "/admin/borrow":
             return BorrowReturnPage().build()

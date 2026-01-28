@@ -7,7 +7,7 @@ class NavBar:
         self.page = page
         self.current_user = current_user
         self.navigate = navigate
-        self.current_route = current_route  # Route hiện tại
+        self.current_route = current_route
     
     def build(self):
         # Danh sách menu items
@@ -22,19 +22,25 @@ class NavBar:
         # Tạo các nút menu
         nav_buttons = []
         for item in menu_items:
-            is_active = self.current_route == item["route"]  # Kiểm tra active
+            is_active = self.current_route == item["route"]
+            
+            # ✅ FIX: Tạo closure đúng cách
+            def make_handler(route):
+                def handler(e):
+                    self.navigate(route)
+                return handler
             
             nav_buttons.append(
                 ft.TextButton(
                     content=ft.Text(
                         item["label"],
                         size=15,
-                        weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL,  # Bold nếu active
-                        color=ft.Colors.CYAN_400 if is_active else ft.Colors.BLACK_87,  # Cyan nếu active
+                        weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL,
+                        color=ft.Colors.CYAN_400 if is_active else ft.Colors.BLACK_87,
                     ),
-                    on_click=lambda _, r=item["route"]: self.navigate(r),
+                    on_click=make_handler(item["route"]),
                     style=ft.ButtonStyle(
-                        overlay_color=ft.Colors.CYAN_50,  # Hover effect
+                        overlay_color=ft.Colors.CYAN_50,
                     ),
                 )
             )

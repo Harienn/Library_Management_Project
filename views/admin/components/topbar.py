@@ -7,6 +7,16 @@ class Topbar:
         self.user_info = user_info
     
     def build(self):
+        # LẤY THÔNG TIN USER
+        user_name = self.user_info.get("name", "User")
+        user_role = self.user_info.get("role_name", "GUEST")
+        
+        # LẤY CHỮ CÁI ĐẦU CỦA TÊN
+        initial = user_name[0].upper() if user_name else "U"
+        
+        # MÀU AVATAR DỰA VÀO ROLE
+        avatar_color = ft.Colors.CYAN_400 if user_role == "ADMIN" else ft.Colors.BLUE_400
+        
         return ft.Container(
             content=ft.Row([
                 ft.Column([
@@ -15,13 +25,17 @@ class Topbar:
                 ], spacing=4),
                 ft.Container(expand=True),
                 ft.Row([
-                    ft.Text("Librarian", size=12, color="#6B7280"),
+                    # HIỂN THỊ TÊN USER VÀ ROLE
+                    ft.Column([
+                        ft.Text(user_name, size=13, weight=ft.FontWeight.W_500, color="#1F2937", text_align=ft.TextAlign.RIGHT),
+                        ft.Text(user_role.capitalize(), size=11, color="#6B7280", text_align=ft.TextAlign.RIGHT),
+                    ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.END),
                     ft.Container(
-                        content=ft.Text("L", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
-                        width=36,
-                        height=36,
-                        bgcolor=ft.Colors.CYAN_400,
-                        border_radius=18,
+                        content=ft.Text(initial, size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                        width=40,
+                        height=40,
+                        bgcolor=avatar_color,
+                        border_radius=20,
                         alignment=ft.Alignment(0, 0),
                     ),
                 ], spacing=12),

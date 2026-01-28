@@ -6,6 +6,7 @@ class Sidebar:
         self.current_route = current_route
         self.navigate = navigate_callback
         self.user_role = user_role
+        self.on_logout = None  # SẼ ĐƯỢC GÁN TỪ ADMIN_APP
     
     def build(self):
         menu_sections = [
@@ -40,8 +41,11 @@ class Sidebar:
             )
             
             for label, route, icon, requires_admin in items:
+                # BỎ QUA menu item nếu requires_admin=True và user không phải Admin
+                if requires_admin and self.user_role != "Admin":
+                    continue  # ← SKIP item này, không render
+                
                 is_active = self.current_route == route
-                is_locked = requires_admin and self.user_role != "Admin"
                 
                 menu_items.append(
                     ft.Container(
@@ -53,14 +57,12 @@ class Sidebar:
                                 color=ft.Colors.WHITE if is_active else "#D1D5DB",
                                 weight=ft.FontWeight.W_500 if is_active else ft.FontWeight.NORMAL,
                             ),
-                            ft.Container(expand=True),
-                            ft.Text("🔒", size=12, color="#9CA3AF") if is_locked else ft.Container(width=0),
                         ], spacing=12),
                         padding=ft.Padding(20, 10, 20, 10),
                         bgcolor="#1E293B" if is_active else ft.Colors.TRANSPARENT,
                         border_radius=6,
                         margin=ft.Margin(8, 0, 8, 2),
-                        on_click=lambda e, r=route, locked=is_locked: self.navigate(r) if not locked else self.navigate("__require_admin__"),
+                        on_click=lambda e, r=route: self.navigate(r),
                         ink=True,
                     )
                 )
@@ -78,7 +80,7 @@ class Sidebar:
                             bgcolor="#DC2626",
                             border_radius=4,
                             margin=ft.Margin(0, 8, 0, 0),
-                            on_click=lambda _: print("Logout"),
+                            on_click=lambda _: self.on_logout() if self.on_logout else None,
                             ink=True,
                         ),
                     ], spacing=2),

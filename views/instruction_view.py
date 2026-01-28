@@ -5,13 +5,14 @@ from components.navbar import NavBar
 
 
 class InstructionView:
-    def __init__(self, page, current_user, navigate):
+    def __init__(self, page, current_user, navigate, on_logout=None):
         self.page = page
         self.current_user = current_user
         self.navigate = navigate
+        self.on_logout = on_logout
     
     def build(self):
-        header = Header(self.page, self.current_user, self.navigate)
+        header = Header(self.page, self.current_user, self.navigate, self.on_logout)
         navbar = NavBar(self.page, self.current_user, self.navigate, "/instruction")
         
         # === BORROWING RULES (CỘT TRÁI) ===
